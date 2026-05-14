@@ -246,6 +246,74 @@ static void test_storage_and_wal_emit_observability(void)
     remove_if_exists(log_path);
 }
 
+static void test_payload_representation_difference(void)
+{
+    BmsRecord a = sample_record("rec_num1", "idem_num1");
+    BmsRecord b = sample_record("rec_num2", "idem_num2");
+    char line_a[8192];
+    char line_b[8192];
+    char modified[8192];
+
+    a.sequence = 1;
+    b.sequence = 1;
+    a.payload_json = "{\"amount\":1000}";
+    b.payload_json = "{\"amount\":1000.0}";
+
+    assert(bms_record_compute_checksum(&a) == BMS_OK);
+    assert(bms_record_compute_checksum(&b) == BMS_OK);
+    /* Different payload representation should produce different checksums (payload is not canonicalized by core). */
+    assert(strcmp(a.checksum, b.checksum) != 0);
+
+    assert(bms_record_to_json_line(&a, line_a, sizeof(line_a)) == BMS_OK);
+    assert(bms_record_to_json_line(&b, line_b, sizeof(line_b)) == BMS_OK);
+    assert(bms_record_verify_json_line(line_a) == BMS_OK);
+    assert(bms_record_verify_json_line(line_b) == BMS_OK);
+
+    /* If payload is swapped but checksum left unchanged, verification must fail. */
+    int written = snprintf(
+        modified,
+        sizeof(modified),
+        "{\"schema_version\":%d,\"sequence\":%llu,\"record_id\":\"%s\",\"record_type\":\"%s\",\"created_at\":\"%s\",\"actor_id\":\"%s\",\"correlation_id\":\"%s\",\"idempotency_key\":\"%s\",\"payload\":%s,\"checksum\":\"%s\"}\n",
+        a.schema_version,
+        a.sequence,
+        a.record_id,
+        a.record_type,
+        a.created_at,
+        a.actor_id,
+        a.correlation_id,
+        a.idempotency_key,
+        b.payload_json, /* use b's payload but a's checksum */
+        a.checksum);
+    assert(written > 0 && (size_t)written < sizeof(modified));
+    assert(bms_record_verify_json_line(modified) == BMS_ERR_CHECKSUM);
+}
+
+static void test_unicode_composed_vs_decomposed(void)
+{
+    BmsRecord a = sample_record("rec_u1", "idem_u1");
+    BmsRecord b = sample_record("rec_u2", "idem_u2");
+    char line_a[8192];
+    char line_b[8192];
+
+    a.sequence = 1;
+    b.sequence = 1;
+
+    /* U+00E9 (é) as single codepoint in UTF-8 */
+    a.payload_json = "{\"note\":\"\xC3\xA9\"}";
+    /* 'e' + combining acute U+0301 (e + ́) */
+    b.payload_json = "{\"note\":\"e\xCC\x81\"}";
+
+    assert(bms_record_compute_checksum(&a) == BMS_OK);
+    assert(bms_record_compute_checksum(&b) == BMS_OK);
+    /* Without Unicode normalization, composed and decomposed forms differ. */
+    assert(strcmp(a.checksum, b.checksum) != 0);
+
+    assert(bms_record_to_json_line(&a, line_a, sizeof(line_a)) == BMS_OK);
+    assert(bms_record_to_json_line(&b, line_b, sizeof(line_b)) == BMS_OK);
+    assert(bms_record_verify_json_line(line_a) == BMS_OK);
+    assert(bms_record_verify_json_line(line_b) == BMS_OK);
+}
+
 int main(void)
 {
     test_record_checksum_round_trip();
@@ -254,6 +322,8 @@ int main(void)
     test_corrupt_checksum_rejected();
     test_wal_pending_and_committed_records();
     test_storage_and_wal_emit_observability();
+    test_payload_representation_difference();
+    test_unicode_composed_vs_decomposed();
 
     return 0;
 }
