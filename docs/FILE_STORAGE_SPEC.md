@@ -29,6 +29,10 @@ Default local layout:
 data/
   manifest.json
   wal/
+# 12. Canonical JSON Serialization and Checksum
+
+**Canonicalization & checksum computation**
+
     current.wal.jsonl
     archive/
   events/
