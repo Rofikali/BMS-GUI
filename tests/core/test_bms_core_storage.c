@@ -2,8 +2,10 @@
 #include "bms/observability/metrics.h"
 #include "bms/observability/storage_telemetry.h"
 #include "bms/status.h"
+#include "bms/storage/data_dir.h"
 #include "bms/storage/jsonl_store.h"
 #include "bms/storage/record.h"
+#include "bms/storage/snapshot.h"
 #include "bms/wal/wal.h"
 
 #include <assert.h>
@@ -14,6 +16,17 @@
 static void remove_if_exists(const char *path)
 {
     remove(path);
+}
+
+static int file_exists(const char *path)
+{
+    FILE *file = fopen(path, "r");
+    if (!file)
+    {
+        return 0;
+    }
+    fclose(file);
+    return 1;
 }
 
 static BmsRecord sample_record(const char *record_id, const char *idempotency_key)
@@ -151,6 +164,122 @@ static void test_wal_pending_and_committed_records(void)
 
     assert(bms_jsonl_verify_file(path, &valid_records) == BMS_OK);
     assert(valid_records == 2);
+
+    remove_if_exists(path);
+}
+
+static void test_data_dir_init_writes_required_layout_and_manifest(void)
+{
+    const char *root = "test_bms_data_core";
+    const char *manifest = "test_bms_data_core/manifest.json";
+    const char *wal_archive = "test_bms_data_core/wal/archive/.probe";
+    FILE *file;
+
+    assert(bms_data_dir_init(root, "2026-05-14T00:00:00Z") == BMS_OK);
+    assert(bms_snapshot_verify_file(manifest) == BMS_OK);
+
+    file = fopen(wal_archive, "w");
+    assert(file != NULL);
+    fputs("ok", file);
+    fclose(file);
+    assert(file_exists(wal_archive) == 1);
+
+    remove_if_exists(wal_archive);
+    remove_if_exists(manifest);
+}
+
+static void test_snapshot_write_atomic_and_verify(void)
+{
+    const char *path = "test_trial_balance.snapshot.json";
+    FILE *file;
+    char line[9000];
+
+    remove_if_exists(path);
+    remove_if_exists("test_trial_balance.snapshot.json.tmp");
+
+    assert(bms_snapshot_write_atomic(
+               path,
+               1,
+               "2026-05-14T00:00:00Z",
+               "[\"accounting/journal_entries.jsonl\"]",
+               42,
+               "{\"debit_total_minor\":118000,\"credit_total_minor\":118000}") == BMS_OK);
+    assert(file_exists(path) == 1);
+    assert(file_exists("test_trial_balance.snapshot.json.tmp") == 0);
+    assert(bms_snapshot_verify_file(path) == BMS_OK);
+
+    file = fopen(path, "w");
+    assert(file != NULL);
+    fputs("{\"generated_at\":\"2026-05-14T00:00:00Z\",\"last_applied_sequence\":42,\"payload\":{\"debit_total_minor\":999999,\"credit_total_minor\":118000},\"schema_version\":1,\"source_files\":[\"accounting/journal_entries.jsonl\"],\"checksum\":\"sha256:0000000000000000000000000000000000000000000000000000000000000000\"}\n", file);
+    fclose(file);
+    (void)line;
+    assert(bms_snapshot_verify_file(path) == BMS_ERR_CHECKSUM);
+
+    remove_if_exists(path);
+}
+
+static void test_wal_detects_pending_on_startup(void)
+{
+    const char *path = "test_wal_pending_startup.jsonl";
+    int decision = -1;
+
+    remove_if_exists(path);
+    assert(bms_wal_append_pending(
+               path,
+               "txn_pending",
+               "2026-05-14T00:00:00Z",
+               "usr_test",
+               "corr_pending",
+               "{\"operation\":\"invoice.create\"}") == BMS_OK);
+
+    assert(bms_wal_inspect_startup(path, NULL, &decision) == BMS_ERR_RECOVERY_REQUIRED);
+    assert(decision == BMS_WAL_RECOVERY_PENDING_ROLLBACK);
+
+    remove_if_exists(path);
+}
+
+static void test_wal_detects_committed_missing_snapshot(void)
+{
+    const char *path = "test_wal_committed_startup.jsonl";
+    const char *snapshot = "test_missing_snapshot.json";
+    int decision = -1;
+
+    remove_if_exists(path);
+    remove_if_exists(snapshot);
+    assert(bms_wal_append_pending(
+               path,
+               "txn_committed",
+               "2026-05-14T00:00:00Z",
+               "usr_test",
+               "corr_committed",
+               "{\"operation\":\"invoice.create\"}") == BMS_OK);
+    assert(bms_wal_append_committed(
+               path,
+               "txn_committed",
+               "2026-05-14T00:00:01Z",
+               "usr_test",
+               "corr_committed") == BMS_OK);
+
+    assert(bms_wal_inspect_startup(path, snapshot, &decision) == BMS_ERR_RECOVERY_REQUIRED);
+    assert(decision == BMS_WAL_RECOVERY_COMMITTED_MISSING_SNAPSHOT);
+
+    remove_if_exists(path);
+}
+
+static void test_wal_corruption_enters_protected_mode(void)
+{
+    const char *path = "test_wal_corrupt_startup.jsonl";
+    FILE *file;
+    int decision = -1;
+
+    remove_if_exists(path);
+    file = fopen(path, "w");
+    assert(file != NULL);
+    fputs("{\"schema_version\":1,\"sequence\":1,\"record_id\":\"wal_bad\",\"record_type\":\"wal.transaction\",\"created_at\":\"2026-05-14T00:00:00Z\",\"actor_id\":\"usr_test\",\"correlation_id\":\"corr_bad\",\"idempotency_key\":\"wal_bad\",\"payload\":{\"transaction_id\":\"txn_bad\",\"state\":\"pending\",\"payload\":{}},\"checksum\":\"sha256:bad\"}\n", file);
+    fclose(file);
+
+    assert(bms_wal_inspect_startup(path, NULL, &decision) == BMS_ERR_PROTECTED_MODE);
+    assert(decision == BMS_WAL_RECOVERY_PROTECTED_READ_ONLY);
 
     remove_if_exists(path);
 }
@@ -321,6 +450,11 @@ int main(void)
     test_duplicate_idempotency_key_rejected();
     test_corrupt_checksum_rejected();
     test_wal_pending_and_committed_records();
+    test_data_dir_init_writes_required_layout_and_manifest();
+    test_snapshot_write_atomic_and_verify();
+    test_wal_detects_pending_on_startup();
+    test_wal_detects_committed_missing_snapshot();
+    test_wal_corruption_enters_protected_mode();
     test_storage_and_wal_emit_observability();
     test_payload_representation_difference();
     test_unicode_composed_vs_decomposed();
