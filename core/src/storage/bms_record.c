@@ -298,8 +298,6 @@ BmsStatus bms_record_compute_checksum(BmsRecord *record)
 
 BmsStatus bms_record_to_json_line(const BmsRecord *record, char *buffer, size_t buffer_size)
 {
-    int written;
-
     if (!record || !buffer || buffer_size == 0) {
         return BMS_ERR_INVALID_ARGUMENT;
     }
@@ -308,25 +306,79 @@ BmsStatus bms_record_to_json_line(const BmsRecord *record, char *buffer, size_t 
         return BMS_ERR_INVALID_ARGUMENT;
     }
 
-    written = snprintf(
-        buffer,
-        buffer_size,
-        "{\"schema_version\":%d,\"sequence\":%llu,\"record_id\":\"%s\",\"record_type\":\"%s\",\"created_at\":\"%s\",\"actor_id\":\"%s\",\"correlation_id\":\"%s\",\"idempotency_key\":\"%s\",\"payload\":%s,\"checksum\":\"%s\"}\n",
-        record->schema_version,
-        record->sequence,
-        safe_str(record->record_id),
-        safe_str(record->record_type),
-        safe_str(record->created_at),
-        safe_str(record->actor_id),
-        safe_str(record->correlation_id),
-        safe_str(record->idempotency_key),
-        record->payload_json,
-        safe_str(record->checksum));
-
-    if (written < 0 || (size_t)written >= buffer_size) {
-        return BMS_ERR_BUFFER_TOO_SMALL;
+    /* Work on a local copy so we can compute checksum if missing. */
+    BmsRecord local = *record;
+    BmsStatus status;
+    if (local.checksum[0] == '\0') {
+        status = bms_record_compute_checksum(&local);
+        if (status != BMS_OK) return status;
     }
 
+    char *canonical = NULL;
+    size_t canonical_len = 0;
+    status = build_canonical_json_no_checksum(&local, &canonical, &canonical_len);
+    if (status != BMS_OK) return status;
+
+    char *out = NULL;
+    size_t out_len = 0;
+    size_t out_cap = 0;
+
+    /* Find the payload token so checksum can be inserted immediately after payload. */
+    const char *payload_tok = ",\"payload\":";
+    char *payload_pos = strstr(canonical, payload_tok);
+    if (!payload_pos) { free(canonical); return BMS_ERR_PARSE; }
+
+    size_t prefix_len = (size_t)(payload_pos - canonical) + strlen(payload_tok);
+    size_t i = prefix_len;
+    if (i >= canonical_len) { free(canonical); return BMS_ERR_PARSE; }
+
+    /* find end of JSON value at i */
+    size_t payload_end = i;
+    char start_ch = canonical[i];
+    if (start_ch == '{' || start_ch == '[') {
+        int depth = 0;
+        for (; payload_end < canonical_len; ++payload_end) {
+            char c = canonical[payload_end];
+            if (c == '{' || c == '[') depth++;
+            else if (c == '}' || c == ']') { depth--; if (depth == 0) { payload_end++; break; } }
+        }
+        if (payload_end > canonical_len) { free(canonical); return BMS_ERR_PARSE; }
+    } else if (start_ch == '"') {
+        payload_end = i + 1;
+        while (payload_end < canonical_len) {
+            if (canonical[payload_end] == '"') {
+                size_t bs = 0; size_t k = payload_end; while (k > i && canonical[--k] == '\\') bs++; if (bs % 2 == 0) { payload_end++; break; }
+                payload_end++;
+            } else payload_end++;
+        }
+        if (payload_end > canonical_len) { free(canonical); return BMS_ERR_PARSE; }
+    } else {
+        payload_end = i;
+        while (payload_end < canonical_len && canonical[payload_end] != ',' && canonical[payload_end] != '}') payload_end++;
+    }
+
+    size_t remainder_start = payload_end; if (remainder_start < canonical_len && canonical[remainder_start] == ',') remainder_start++;
+
+    /* Build final output */
+    if (ensure_capacity(&out, &out_cap, payload_end + 128) != BMS_OK) { free(canonical); free(out); return BMS_ERR_IO; }
+    if (append_raw(&out, &out_len, &out_cap, canonical) != BMS_OK) { free(canonical); free(out); return BMS_ERR_IO; }
+    out_len = payload_end; out[out_len] = '\0';
+    if (append_raw(&out, &out_len, &out_cap, ",\"checksum\":\"") != BMS_OK) { free(canonical); free(out); return BMS_ERR_IO; }
+    if (append_raw(&out, &out_len, &out_cap, local.checksum) != BMS_OK) { free(canonical); free(out); return BMS_ERR_IO; }
+    if (append_raw(&out, &out_len, &out_cap, "\"") != BMS_OK) { free(canonical); free(out); return BMS_ERR_IO; }
+    if (remainder_start < canonical_len) {
+        if (append_char(&out, &out_len, &out_cap, ',') != BMS_OK) { free(canonical); free(out); return BMS_ERR_IO; }
+        if (append_raw(&out, &out_len, &out_cap, canonical + remainder_start) != BMS_OK) { free(canonical); free(out); return BMS_ERR_IO; }
+    } else {
+        if (append_char(&out, &out_len, &out_cap, '}') != BMS_OK) { free(canonical); free(out); return BMS_ERR_IO; }
+    }
+    if (append_char(&out, &out_len, &out_cap, '\n') != BMS_OK) { free(canonical); free(out); return BMS_ERR_IO; }
+
+    free(canonical);
+    if (out_len + 1 > buffer_size) { free(out); return BMS_ERR_BUFFER_TOO_SMALL; }
+    memcpy(buffer, out, out_len);
+    buffer[out_len] = '\0';
+    free(out);
     return BMS_OK;
 }
 
