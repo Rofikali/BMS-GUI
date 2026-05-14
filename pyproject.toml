@@ -1,0 +1,32 @@
+[project]
+name = "bms-gui"
+version = "0.1.0"
+description = "Offline-first Business Management System with a C11 durability core and Python/PySide6 GUI."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pyside6>=6.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+bms-gui = "bms.ui.main:main"
+bms-core-smoke = "bms.app.bootstrap:main"
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bms"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

@@ -1,14 +1,27 @@
-# Python Bindings
+# Python Binding Boundary
 
-Python bindings will be added after the C storage/WAL API stabilizes.
+The Python layer loads the native C11 durability core through `ctypes`.
 
-The intended boundary is:
+Build the shared library first:
 
-```text
-PySide6 UI
--> Python application services
--> Python bindings
--> C core
+```sh
+cmake -S . -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
-No critical storage logic belongs in Python.
+Then run Python tooling with uv:
+
+```sh
+uv sync
+uv run bms-core-smoke
+uv run bms-gui
+
+
+python3 -m uv run bms-core-smoke
+python3 -m uv run python -m unittest tests.unit.test_core_file_store tests.unit.test_accounting_service
+
+```
+
+The UI and Python services must call application services and this binding layer.
+They must not open critical storage files directly.

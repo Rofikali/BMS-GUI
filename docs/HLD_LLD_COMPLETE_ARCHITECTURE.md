@@ -1,5 +1,7 @@
 # HLD_LLD_COMPLETE_ARCHITECTURE.md
+
 # COMPLETE HIGH-LEVEL & LOW-LEVEL SYSTEM DESIGN
+
 ## Principal Engineer + SRE + CA + MBA Architecture Blueprint
 
 ---
@@ -17,6 +19,7 @@ Business Operating Platform
 ```
 
 Primary Goals:
+
 - financial correctness
 - operational reliability
 - recoverability
@@ -34,13 +37,14 @@ Primary Goals:
 
 Core Principle:
 
-> Build a modular monolith first, but design module boundaries as future services. 
+> Build a modular monolith first, but design module boundaries as future services.
 
 ---
 
 ## 2.2 SRE VIEW
 
 Architecture must support:
+
 - observability
 - deterministic recovery
 - operational diagnostics
@@ -54,6 +58,7 @@ Financial correctness is:
 non-negotiable.
 
 Architecture must guarantee:
+
 - auditability
 - double-entry correctness
 - transactional safety
@@ -63,6 +68,7 @@ Architecture must guarantee:
 ## 2.4 MBA VIEW
 
 Architecture must optimize:
+
 - operational efficiency
 - maintainability cost
 - long-term scalability
@@ -182,6 +188,7 @@ Plugins --> EventBus
 # 5.2 MODULE RULES
 
 Modules must NEVER:
+
 - access each other directly,
 - bypass APIs,
 - bypass event bus,
@@ -300,6 +307,7 @@ SERVICE --> EVENTS
 # 8.2 UI RULES
 
 UI must NEVER:
+
 - directly access storage,
 - directly modify ledgers,
 - contain business logic.
@@ -669,6 +677,7 @@ typedef struct {
 # 16.3 PLUGIN RULES
 
 Plugins must NEVER:
+
 - access raw storage,
 - bypass audit systems,
 - mutate ledgers directly.
@@ -857,6 +866,7 @@ LoggerThread
 # 22.2 THREAD RULES
 
 UI thread must NEVER:
+
 - block on storage,
 - perform heavy analytics,
 - wait on network.
@@ -983,6 +993,7 @@ Valgrind
 # 26.1 HOT PATHS
 
 Optimize:
+
 - WAL append
 - inventory lookup
 - event dispatch
@@ -1011,6 +1022,7 @@ Request
 # 27.1 EXTRACTION PLAN
 
 Future extraction candidates:
+
 - analytics
 - reports
 - sync engine
@@ -1021,6 +1033,7 @@ Future extraction candidates:
 # 27.2 WHY EXTRACTION WILL WORK
 
 Because architecture already uses:
+
 - events
 - module boundaries
 - storage isolation
@@ -1078,6 +1091,7 @@ API-->>UI: Invoice Created
 # 29.1 CORE PRINCIPLES
 
 The system prioritizes:
+
 - correctness
 - reliability
 - recoverability
@@ -1090,6 +1104,7 @@ The system prioritizes:
 # 29.2 WHAT MAKES THIS INDUSTRY GRADE
 
 This architecture includes:
+
 - event-driven modularity
 - WAL durability
 - accounting correctness
@@ -1113,6 +1128,7 @@ This architecture establishes:
 - long-term maintainability.
 
 Core architectural goals:
+
 - correctness
 - survivability
 - operational simplicity

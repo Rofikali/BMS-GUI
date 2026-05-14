@@ -1,4 +1,5 @@
 # FILE_STORAGE_SPEC.md
+
 # MVP File-Based Storage Contract
 
 This document is the authoritative file storage contract for the MVP. It implements ADR 0002.
@@ -28,6 +29,10 @@ Default local layout:
 data/
   manifest.json
   wal/
+# 12. Canonical JSON Serialization and Checksum
+
+**Canonicalization & checksum computation**
+
     current.wal.jsonl
     archive/
   events/
@@ -106,7 +111,7 @@ Every append-only record uses this envelope:
 Rules:
 
 - `sequence` is monotonic per file.
-- `checksum` covers every field except `checksum`.
+- `checksum` covers every field except `checksum` and MUST be computed as SHA-256 over a canonical JSON serialization of the record (stable key ordering, UTF-8, no insignificant whitespace); representation format: `sha256:<hex>`.
 - `idempotency_key` prevents duplicate workflow commits.
 - `correlation_id` links invoice, inventory, accounting, event, and audit records.
 
@@ -210,15 +215,19 @@ bms_record_compute_checksum
 bms_record_to_json_line
 bms_record_verify_json_line
 bms_jsonl_append_record
+bms_jsonl_append_record_with_telemetry
 bms_jsonl_verify_file
+bms_jsonl_verify_file_with_telemetry
 bms_jsonl_next_sequence
 bms_wal_append_pending
+bms_wal_append_pending_with_telemetry
 bms_wal_append_committed
+bms_wal_append_committed_with_telemetry
 ```
 
 ---
 
-# 11. Observability Requirements
+# 9. Observability Requirements
 
 Every critical storage/WAL operation must be observable.
 
@@ -251,7 +260,7 @@ Logs are JSONL and must carry:
 
 ---
 
-# 9. Backup Rules
+# 10. Backup Rules
 
 Backup includes:
 
@@ -270,7 +279,7 @@ Backup validation must:
 
 ---
 
-# 10. Performance Boundaries
+# 11. Performance Boundaries
 
 MVP is optimized for correctness first.
 

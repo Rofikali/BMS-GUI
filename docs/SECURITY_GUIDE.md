@@ -1,6 +1,9 @@
 # SECURITY_GUIDE.md
+
 # INDUSTRY-GRADE SECURITY ARCHITECTURE
+
 ## Security, Auditability & Operational Protection Guide
+
 ### Principal Engineer + SRE + CA + MBA Perspective
 
 ---
@@ -12,11 +15,13 @@ The platform is designed as a:
 > Secure, Auditable, Offline-First Business Operating Platform.
 
 Security is NOT:
+
 - just login screens,
 - password protection,
 - antivirus assumptions.
 
 Security is:
+
 - architectural,
 - operational,
 - financial,
@@ -24,6 +29,7 @@ Security is:
 - audit-driven.
 
 The system must protect:
+
 - accounting data
 - business records
 - operational workflows
@@ -33,6 +39,7 @@ The system must protect:
 - user permissions
 
 from:
+
 - accidental corruption
 - malicious modification
 - privilege abuse
@@ -49,9 +56,10 @@ from:
 
 Core Principle:
 
-> Security must be built into architecture, not patched afterward. 
+> Security must be built into architecture, not patched afterward.
 
 Security must exist in:
+
 - module boundaries
 - storage layers
 - APIs
@@ -64,12 +72,14 @@ Security must exist in:
 ## 2.2 SRE PERSPECTIVE
 
 Operational security means:
+
 - survivability,
 - observability,
 - tamper detection,
 - safe recovery.
 
 Security incidents must be:
+
 - detectable,
 - diagnosable,
 - recoverable.
@@ -79,6 +89,7 @@ Security incidents must be:
 ## 2.3 CA PERSPECTIVE
 
 Financial systems require:
+
 - immutable audit trails
 - accounting integrity
 - transaction traceability
@@ -86,19 +97,21 @@ Financial systems require:
 
 Core Principle:
 
-> Financial records must be provably trustworthy. 
+> Financial records must be provably trustworthy.
 
 ---
 
 ## 2.4 MBA PERSPECTIVE
 
 Security protects:
+
 - customer trust
 - business continuity
 - legal compliance
 - operational reputation
 
 Weak security directly impacts:
+
 - revenue
 - reputation
 - scalability
@@ -128,6 +141,7 @@ The platform must provide:
 # 4.1 INTERNAL THREATS
 
 Examples:
+
 - accidental deletion
 - privilege misuse
 - operator mistakes
@@ -138,6 +152,7 @@ Examples:
 # 4.2 EXTERNAL THREATS
 
 Examples:
+
 - malware
 - plugin tampering
 - unauthorized access
@@ -148,6 +163,7 @@ Examples:
 # 4.3 OPERATIONAL THREATS
 
 Examples:
+
 - power failure
 - storage corruption
 - failed upgrades
@@ -180,6 +196,7 @@ User Layer
 # 6.1 AUTHENTICATION GOALS
 
 Need:
+
 - secure login
 - session validation
 - brute-force protection
@@ -203,12 +220,14 @@ Login Request
 # 6.3 PASSWORD RULES
 
 Passwords must support:
+
 - hashing
 - salting
 - minimum complexity
 - secure storage
 
 Passwords must NEVER:
+
 - be stored plaintext
 - appear in logs
 - bypass hashing
@@ -218,12 +237,14 @@ Passwords must NEVER:
 # 6.4 PASSWORD HASHING
 
 Recommended:
+
 ```text
 Argon2
 bcrypt
 ```
 
 Never use:
+
 ```text
 MD5
 SHA1
@@ -239,6 +260,7 @@ plaintext
 # 7.1 SESSION REQUIREMENTS
 
 Sessions require:
+
 - expiration
 - invalidation
 - secure identifiers
@@ -260,6 +282,7 @@ Authenticate
 # 7.3 SESSION SECURITY
 
 Sessions must:
+
 - timeout automatically
 - invalidate on logout
 - invalidate on privilege changes
@@ -274,7 +297,7 @@ Sessions must:
 
 Core Principle:
 
-> Users should access only what they need. 
+> Users should access only what they need.
 
 ---
 
@@ -319,6 +342,7 @@ Critical financial protections.
 # 9.1 ACCOUNTING RULES
 
 Financial records must NEVER:
+
 - be silently modified
 - bypass journals
 - bypass audit trails
@@ -331,6 +355,7 @@ Financial records must NEVER:
 Assets = Liabilities + Equity
 
 Violation triggers:
+
 - diagnostics
 - alerts
 - read-only protection mode
@@ -353,13 +378,14 @@ Total Debits = Total Credits
 
 Core Principle:
 
-> Every critical action must be traceable. 
+> Every critical action must be traceable.
 
 ---
 
 # 10.2 AUDIT REQUIREMENTS
 
 Critical operations require:
+
 - timestamps
 - operator IDs
 - correlation IDs
@@ -401,6 +427,7 @@ AUDIT_TAMPERING_DETECTED
 # 11.1 GOALS
 
 Detect:
+
 - unauthorized changes
 - ledger modifications
 - plugin replacement
@@ -427,6 +454,7 @@ Audit archives
 # 11.3 CHECKSUM VALIDATION
 
 Every critical artifact requires:
+
 - checksums
 - integrity validation
 - corruption detection
@@ -440,6 +468,7 @@ Every critical artifact requires:
 # 12.1 STORAGE GOALS
 
 Need:
+
 - corruption detection
 - atomic writes
 - durability
@@ -475,6 +504,7 @@ Corruption Detected
 # 13.1 PLUGIN THREAT MODEL
 
 Plugins can introduce:
+
 - malicious behavior
 - crashes
 - data corruption
@@ -485,6 +515,7 @@ Plugins can introduce:
 # 13.2 PLUGIN SECURITY RULES
 
 Plugins must NEVER:
+
 - access internal storage directly
 - bypass APIs
 - mutate ledgers directly
@@ -495,6 +526,7 @@ Plugins must NEVER:
 # 13.3 PLUGIN SANDBOX
 
 Plugins operate through:
+
 - capability validation
 - restricted APIs
 - event interfaces
@@ -518,6 +550,7 @@ reporting.generate
 # 13.5 PLUGIN SIGNATURES (FUTURE)
 
 Future support:
+
 - signed plugins
 - trust validation
 - marketplace verification
@@ -531,6 +564,7 @@ Future support:
 # 14.1 EVENT RULES
 
 Events must support:
+
 - validation
 - integrity
 - traceability
@@ -541,6 +575,7 @@ Events must support:
 # 14.2 EVENT SAFETY
 
 Event handlers must:
+
 - validate payloads
 - reject malformed data
 - avoid unsafe mutations
@@ -554,6 +589,7 @@ Event handlers must:
 # 15.1 INPUT SECURITY RULES
 
 All inputs require:
+
 - schema validation
 - bounds checking
 - type validation
@@ -579,6 +615,7 @@ Invalid Input
 # 16.1 MEMORY GOALS
 
 Need:
+
 - deterministic ownership
 - leak prevention
 - overflow prevention
@@ -589,6 +626,7 @@ Need:
 # 16.2 NATIVE SECURITY RULES
 
 C/Assembly modules must:
+
 - validate bounds
 - avoid unsafe pointer arithmetic
 - avoid double frees
@@ -614,6 +652,7 @@ Explicit Ownership
 # 17.1 THREADING RULES
 
 Need:
+
 - synchronization
 - race prevention
 - lock ordering
@@ -624,6 +663,7 @@ Need:
 # 17.2 THREAD SAFETY PRINCIPLES
 
 Avoid:
+
 - shared mutable state
 - uncontrolled thread creation
 - UI thread blocking
@@ -637,6 +677,7 @@ Avoid:
 # 18.1 LOGGING RULES
 
 Logs must NEVER expose:
+
 - passwords
 - raw secrets
 - sensitive tokens
@@ -663,6 +704,7 @@ Logs must NEVER expose:
 # 19.1 BACKUP PROTECTION
 
 Backups require:
+
 - encryption
 - integrity checks
 - access control
@@ -673,6 +715,7 @@ Backups require:
 # 19.2 BACKUP RESTORE SECURITY
 
 Restore operations require:
+
 - authorization
 - audit approval
 - integrity validation
@@ -686,6 +729,7 @@ Restore operations require:
 # 20.1 RECOVERY RULES
 
 Recovery must NEVER:
+
 - bypass accounting validation
 - skip integrity checks
 - restore corrupted state silently
@@ -695,6 +739,7 @@ Recovery must NEVER:
 # 20.2 RECOVERY VALIDATIONS
 
 Need:
+
 - trial balance validation
 - ledger consistency
 - checksum verification
@@ -709,6 +754,7 @@ Need:
 # 21.1 SAFE MODE
 
 Enabled during:
+
 - corruption detection
 - failed recovery
 - diagnostics workflows
@@ -718,6 +764,7 @@ Enabled during:
 # 21.2 READ-ONLY MODE
 
 Triggered when:
+
 - accounting inconsistency detected
 - WAL corruption detected
 
@@ -736,6 +783,7 @@ Administrative-only operations allowed.
 # 22.1 SECURITY LOGGING
 
 Need:
+
 - structured logs
 - traceability
 - correlation IDs
@@ -791,6 +839,7 @@ PLUGIN_SECURITY_VIOLATION
 # 24.1 REQUIRED TEST TYPES
 
 Need:
+
 - penetration testing
 - fuzz testing
 - corruption simulations
@@ -802,6 +851,7 @@ Need:
 # 24.2 FUZZ TESTING TARGETS
 
 Need fuzz testing for:
+
 - parsers
 - plugin APIs
 - event payloads
@@ -813,6 +863,7 @@ Need fuzz testing for:
 # 25. FUTURE SECURITY EVOLUTION
 
 Future support:
+
 - MFA
 - hardware-backed encryption
 - cloud synchronization security
@@ -834,6 +885,7 @@ UNAUTHORIZED_LEDGER_MUTATION
 ```
 
 These trigger:
+
 - alerts
 - diagnostics
 - recovery workflows
@@ -852,6 +904,7 @@ This security architecture establishes:
 - long-term maintainability.
 
 Core security goals:
+
 - integrity
 - traceability
 - recoverability
