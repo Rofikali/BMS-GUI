@@ -42,7 +42,7 @@ without:
 
 Core Principle:
 
-> “Recovery is more important than uptime.”
+> Recovery is more important than uptime. 
 
 A fast system that:
 cannot recover reliably
@@ -150,12 +150,9 @@ Audit Archives
 
 ```text
 Application Layer
-    ?
-Storage Layer
-    ?
-Filesystem Layer
-    ?
-External Backup Layer
+    -> Storage Layer
+    -> Filesystem Layer
+    -> External Backup Layer
 ```
 
 ---
@@ -171,7 +168,7 @@ Write Ahead Log.
 
 Core Principle:
 
-> “Nothing becomes durable until WAL commit succeeds.”
+> Nothing becomes durable until WAL commit succeeds. 
 
 ---
 
@@ -179,18 +176,12 @@ Core Principle:
 
 ```text
 Business Operation
-    ?
-Validation
-    ?
-Journal Generation
-    ?
-WAL Append
-    ?
-WAL Flush
-    ?
-Storage Mutation
-    ?
-Commit
+    -> Validation
+    -> Journal Generation
+    -> WAL Append
+    -> WAL Flush
+    -> Storage Mutation
+    -> Commit
 ```
 
 ---
@@ -259,16 +250,11 @@ Snapshots provide:
 
 ```text
 Pause Writes
-    ?
-Flush WAL
-    ?
-Freeze State
-    ?
-Create Snapshot
-    ?
-Generate Checksums
-    ?
-Resume Writes
+    -> Flush WAL
+    -> Freeze State
+    -> Create Snapshot
+    -> Generate Checksums
+    -> Resume Writes
 ```
 
 ---
@@ -307,7 +293,7 @@ metadata
 
 Core Principle:
 
-> “Silent corruption is unacceptable.”
+> Silent corruption is unacceptable. 
 
 Every critical artifact requires:
 - checksum validation
@@ -339,22 +325,14 @@ Audit archives
 
 ```text
 Start Backup
-    ?
-Validate Storage
-    ?
-Pause Writes
-    ?
-Flush WAL
-    ?
-Create Snapshot
-    ?
-Archive WAL
-    ?
-Generate Checksums
-    ?
-Resume Operations
-    ?
-Verify Backup
+    -> Validate Storage
+    -> Pause Writes
+    -> Flush WAL
+    -> Create Snapshot
+    -> Archive WAL
+    -> Generate Checksums
+    -> Resume Operations
+    -> Verify Backup
 ```
 
 ---
@@ -394,18 +372,12 @@ Supported recovery modes:
 
 ```text
 Failure Detection
-    ?
-Isolation
-    ?
-Snapshot Load
-    ?
-WAL Replay
-    ?
-Integrity Validation
-    ?
-Accounting Validation
-    ?
-Operational Restore
+    -> Isolation
+    -> Snapshot Load
+    -> WAL Replay
+    -> Integrity Validation
+    -> Accounting Validation
+    -> Operational Restore
 ```
 
 ---
@@ -428,16 +400,11 @@ Crash conditions:
 
 ```text
 Detect Crash
-    ?
-Scan WAL
-    ?
-Identify Last Valid LSN
-    ?
-Replay Valid Transactions
-    ?
-Discard Incomplete Transactions
-    ?
-Validate Accounting
+    -> Scan WAL
+    -> Identify Last Valid LSN
+    -> Replay Valid Transactions
+    -> Discard Incomplete Transactions
+    -> Validate Accounting
 ```
 
 ---
@@ -459,16 +426,11 @@ Recovery must NEVER:
 
 ```text
 Read WAL Segment
-    ?
-Validate Checksum
-    ?
-Deserialize Record
-    ?
-Validate Transaction
-    ?
-Apply Mutation
-    ?
-Advance LSN
+    -> Validate Checksum
+    -> Deserialize Record
+    -> Validate Transaction
+    -> Apply Mutation
+    -> Advance LSN
 ```
 
 ---
@@ -501,7 +463,7 @@ mandatory validations:
 
 # 12.2 ACCOUNTING VALIDATION RULE
 
-:contentReference[oaicite:0]{index=0}
+Assets = Liabilities + Equity
 
 If violated:
 system enters:
@@ -514,7 +476,7 @@ system enters:
 
 Recovery must validate:
 
-:contentReference[oaicite:1]{index=1}
+Total Debits = Total Credits
 
 ---
 
@@ -532,12 +494,9 @@ Inventory recovery validates:
 
 ```text
 Inventory Mismatch
-    ?
-Audit Trigger
-    ?
-Reconciliation
-    ?
-Correction Workflow
+    -> Audit Trigger
+    -> Reconciliation
+    -> Correction Workflow
 ```
 
 ---
@@ -559,12 +518,9 @@ Configs require:
 
 ```text
 Load Backup Config
-    ?
-Validate Schema
-    ?
-Validate Compatibility
-    ?
-Apply Runtime
+    -> Validate Schema
+    -> Validate Compatibility
+    -> Apply Runtime
 ```
 
 ---
@@ -587,12 +543,9 @@ Plugin backups include:
 
 ```text
 Plugin Crash
-    ?
-Disable Plugin
-    ?
-Restore Safe State
-    ?
-Notify Operator
+    -> Disable Plugin
+    -> Restore Safe State
+    -> Notify Operator
 ```
 
 ---
@@ -616,16 +569,11 @@ Supported:
 
 ```text
 Isolate Failure
-    ?
-Restore Snapshot
-    ?
-Replay WAL
-    ?
-Validate Integrity
-    ?
-Validate Accounting
-    ?
-Resume Operations
+    -> Restore Snapshot
+    -> Replay WAL
+    -> Validate Integrity
+    -> Validate Accounting
+    -> Resume Operations
 ```
 
 ---
@@ -749,7 +697,7 @@ All recovery operations require:
 
 Core Principle:
 
-> “Untested backups are fake backups.”
+> Untested backups are fake backups. 
 
 ---
 

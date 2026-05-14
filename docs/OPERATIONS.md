@@ -41,7 +41,7 @@ without:
 
 Core Principle:
 
-> “Systems must survive real-world operational failures.”
+> Systems must survive real-world operational failures. 
 
 The platform must support:
 - graceful degradation
@@ -167,22 +167,14 @@ Examples:
 
 ```text
 Process Start
-    ?
-Config Validation
-    ?
-Storage Validation
-    ?
-WAL Validation
-    ?
-Recovery Check
-    ?
-Plugin Validation
-    ?
-Module Initialization
-    ?
-Health Verification
-    ?
-Ready State
+    -> Config Validation
+    -> Storage Validation
+    -> WAL Validation
+    -> Recovery Check
+    -> Plugin Validation
+    -> Module Initialization
+    -> Health Verification
+    -> Ready State
 ```
 
 ---
@@ -209,20 +201,13 @@ Mandatory checks:
 
 ```text
 Shutdown Request
-    ?
-Reject New Transactions
-    ?
-Flush Queues
-    ?
-Commit WAL
-    ?
-Save Snapshots
-    ?
-Unload Plugins
-    ?
-Close Storage
-    ?
-Terminate
+    -> Reject New Transactions
+    -> Flush Queues
+    -> Commit WAL
+    -> Save Snapshots
+    -> Unload Plugins
+    -> Close Storage
+    -> Terminate
 ```
 
 ---
@@ -285,16 +270,11 @@ Storage must provide:
 
 ```text
 Operation
-    ?
-Validation
-    ?
-WAL Append
-    ?
-Storage Write
-    ?
-Checksum Validation
-    ?
-Commit
+    -> Validation
+    -> WAL Append
+    -> Storage Write
+    -> Checksum Validation
+    -> Commit
 ```
 
 ---
@@ -305,10 +285,10 @@ On corruption:
 
 ```text
 Detect
-? Isolate
-? Read-Only Mode
-? Recovery Workflow
-? Validation
+-> Isolate
+-> Read-Only Mode
+-> Recovery Workflow
+-> Validation
 ```
 
 ---
@@ -321,7 +301,7 @@ Detect
 
 Core Principle:
 
-> “Durability before visibility.”
+> Durability before visibility. 
 
 No operation becomes visible:
 before WAL append success.
@@ -332,14 +312,10 @@ before WAL append success.
 
 ```text
 Transaction
-    ?
-Serialize
-    ?
-Append WAL
-    ?
-Flush
-    ?
-Apply State
+    -> Serialize
+    -> Append WAL
+    -> Flush
+    -> Apply State
 ```
 
 ---
@@ -350,9 +326,9 @@ At startup:
 
 ```text
 Read WAL
-? Validate
-? Replay
-? Verify Integrity
+-> Validate
+-> Replay
+-> Verify Integrity
 ```
 
 ---
@@ -375,16 +351,11 @@ Backups must support:
 
 ```text
 Pause Writes
-    ?
-Flush WAL
-    ?
-Create Snapshot
-    ?
-Checksum Validation
-    ?
-Archive Backup
-    ?
-Resume Operations
+    -> Flush WAL
+    -> Create Snapshot
+    -> Checksum Validation
+    -> Archive Backup
+    -> Resume Operations
 ```
 
 ---
@@ -418,16 +389,11 @@ System recovery must be:
 
 ```text
 Crash Detection
-    ?
-WAL Scan
-    ?
-Corruption Check
-    ?
-Replay Transactions
-    ?
-Validate Accounting
-    ?
-Restore Service
+    -> WAL Scan
+    -> Corruption Check
+    -> Replay Transactions
+    -> Validate Accounting
+    -> Restore Service
 ```
 
 ---
@@ -465,14 +431,10 @@ Accounting operations must NEVER:
 
 ```text
 Accounting Failure
-    ?
-Freeze Transaction
-    ?
-Generate Audit Event
-    ?
-Enter Diagnostics Mode
-    ?
-Recovery Validation
+    -> Freeze Transaction
+    -> Generate Audit Event
+    -> Enter Diagnostics Mode
+    -> Recovery Validation
 ```
 
 ---
@@ -558,14 +520,10 @@ Need:
 
 ```text
 Handler Failure
-    ?
-Retry Queue
-    ?
-Retry Limit
-    ?
-Dead Letter Queue
-    ?
-Diagnostics
+    -> Retry Queue
+    -> Retry Limit
+    -> Dead Letter Queue
+    -> Diagnostics
 ```
 
 ---
@@ -597,14 +555,10 @@ Monitor:
 
 ```text
 Plugin Failure
-    ?
-Isolation
-    ?
-Disable Plugin
-    ?
-Generate Audit Event
-    ?
-Notify Operator
+    -> Isolation
+    -> Disable Plugin
+    -> Generate Audit Event
+    -> Notify Operator
 ```
 
 ---
@@ -627,16 +581,11 @@ Deployment must support:
 
 ```text
 Backup Current State
-    ?
-Validate Package
-    ?
-Stop Services
-    ?
-Apply Upgrade
-    ?
-Validate Integrity
-    ?
-Restart
+    -> Validate Package
+    -> Stop Services
+    -> Apply Upgrade
+    -> Validate Integrity
+    -> Restart
 ```
 
 ---
@@ -645,14 +594,10 @@ Restart
 
 ```text
 Upgrade Failure
-    ?
-Restore Backup
-    ?
-Restore Snapshot
-    ?
-Replay WAL
-    ?
-Validate Integrity
+    -> Restore Backup
+    -> Restore Snapshot
+    -> Replay WAL
+    -> Validate Integrity
 ```
 
 ---
@@ -675,12 +620,9 @@ Configuration must support:
 
 ```text
 Config Change
-    ?
-Validate Schema
-    ?
-Apply Runtime
-    ?
-Generate Audit Event
+    -> Validate Schema
+    -> Apply Runtime
+    -> Generate Audit Event
 ```
 
 ---
@@ -703,12 +645,9 @@ Need:
 
 ```text
 Stack
-?
-Arena Allocators
-?
-Memory Pools
-?
-Heap (minimal)
+-> Arena Allocators
+-> Memory Pools
+-> Heap (minimal)
 ```
 
 ---
@@ -717,12 +656,9 @@ Heap (minimal)
 
 ```text
 Allocation Failure
-    ?
-Diagnostics
-    ?
-Graceful Degradation
-    ?
-Recovery
+    -> Diagnostics
+    -> Graceful Degradation
+    -> Recovery
 ```
 
 ---
@@ -866,16 +802,11 @@ Supported scenarios:
 
 ```text
 Incident Detection
-    ?
-System Isolation
-    ?
-Backup Restore
-    ?
-WAL Replay
-    ?
-Integrity Validation
-    ?
-Operational Recovery
+    -> System Isolation
+    -> Backup Restore
+    -> WAL Replay
+    -> Integrity Validation
+    -> Operational Recovery
 ```
 
 ---

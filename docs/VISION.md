@@ -1,5 +1,7 @@
 # VISION.md
+
 # INDUSTRY-GRADE BUSINESS OPERATING PLATFORM
+
 ## Principal Engineer + SRE + CA + MBA Vision Document
 
 ---
@@ -13,16 +15,19 @@ Build a:
 > Modular, Offline-First, Native-Powered, Event-Driven, Accounting-Correct, Operationally-Scalable Business Operating Platform.
 
 The system is designed to evolve from:
+
 - a retail shop system
 into
 - a complete operational business platform.
 
 This project is NOT:
+
 - a toy billing app,
 - a basic CRUD system,
 - a simple POS software.
 
 This project IS:
+
 - an enterprise-grade operational platform,
 - an accounting-aware business system,
 - an analytics-driven intelligence engine,
@@ -55,6 +60,7 @@ The platform must:
 ## 3.1 PRINCIPAL ENGINEER PERSPECTIVE
 
 Focus Areas:
+
 - long-term survivability
 - architectural boundaries
 - modularity
@@ -66,9 +72,10 @@ Focus Areas:
 
 Core Principle:
 
-> “Architecture is controlled system evolution.”
+> Architecture is controlled system evolution.
 
 The system must:
+
 - evolve safely,
 - scale gradually,
 - preserve boundaries,
@@ -80,6 +87,7 @@ The system must:
 ## 3.2 SRE PERSPECTIVE
 
 Focus Areas:
+
 - reliability
 - observability
 - fault tolerance
@@ -89,9 +97,10 @@ Focus Areas:
 
 Core Principle:
 
-> “Systems must survive real-world failures.”
+> Systems must survive real-world failures.
 
 The platform must tolerate:
+
 - power loss
 - storage corruption
 - plugin crashes
@@ -105,6 +114,7 @@ The platform must tolerate:
 ## 3.3 CA (CHARTERED ACCOUNTANT) PERSPECTIVE
 
 Focus Areas:
+
 - accounting correctness
 - auditability
 - reconciliation
@@ -115,9 +125,10 @@ Focus Areas:
 
 Core Principle:
 
-> “Every business event must produce accounting impact.”
+> Every business event must produce accounting impact.
 
 The system must guarantee:
+
 - financial correctness,
 - audit trails,
 - immutable accounting history,
@@ -128,6 +139,7 @@ The system must guarantee:
 ## 3.4 MBA PERSPECTIVE
 
 Focus Areas:
+
 - operational efficiency
 - profitability
 - inventory optimization
@@ -138,9 +150,10 @@ Focus Areas:
 
 Core Principle:
 
-> “Operational data should drive business decisions.”
+> Operational data should drive business decisions.
 
 The platform must provide:
+
 - KPI visibility,
 - operational metrics,
 - business insights,
@@ -160,6 +173,7 @@ The platform should become:
 - a plugin-based operational framework.
 
 The software should eventually support:
+
 - single-shop operations
 - multi-branch operations
 - warehouse workflows
@@ -173,6 +187,7 @@ The software should eventually support:
 # 5. TARGET USERS
 
 Primary Users:
+
 - retail shops
 - wholesalers
 - distributors
@@ -181,6 +196,7 @@ Primary Users:
 - inventory managers
 
 Secondary Users:
+
 - multi-branch operators
 - franchise operations
 - service businesses
@@ -196,16 +212,19 @@ Secondary Users:
 ## 6.1 OFFLINE-FIRST
 
 The system must operate:
+
 - fully locally,
 - without internet dependency.
 
 Reason:
+
 - reliability,
 - speed,
 - operational continuity,
 - lower infrastructure dependency.
 
 Cloud integration should be:
+
 - optional,
 - additive,
 - future-ready.
@@ -215,12 +234,14 @@ Cloud integration should be:
 ## 6.2 MODULARITY
 
 Every business capability must exist as:
+
 - isolated modules,
 - with clear contracts,
 - minimal coupling,
 - independent evolution paths.
 
 Reason:
+
 - maintainability,
 - scalability,
 - future service extraction.
@@ -230,28 +251,33 @@ Reason:
 ## 6.3 EVENT-DRIVEN DESIGN
 
 The system should internally behave like:
+
 - loosely coupled services.
 
 Reason:
+
 - scalability,
 - extensibility,
 - future distributed architecture.
 
 Core Principle:
 
-> “Modules communicate through events and contracts, not internal mutations.”
+> Modules communicate through events and contracts, not internal mutations.
 
 ---
 
 ## 6.4 ACCOUNTING-CORRECT DESIGN
 
 Accounting is NOT:
+
 - a reporting afterthought.
 
 Accounting is:
+
 - a foundational system layer.
 
 All operations:
+
 - inventory,
 - billing,
 - refunds,
@@ -259,6 +285,7 @@ All operations:
 - purchases
 
 must generate:
+
 - accounting impact,
 - audit events,
 - traceable financial records.
@@ -270,6 +297,7 @@ must generate:
 The platform must remain diagnosable.
 
 Need:
+
 - structured logging
 - metrics
 - tracing
@@ -278,6 +306,7 @@ Need:
 - operational visibility
 
 Reason:
+
 - maintainability,
 - operational stability,
 - faster debugging,
@@ -292,13 +321,16 @@ Reason:
 ## 7.1 FINAL ARCHITECTURE
 
 Primary Architecture:
+
 - Modular Monolith
 
 Internal Style:
+
 - Event-Driven
 - Service-Oriented Modules
 
 Future Evolution:
+
 - Extractable Microservices
 
 ---
@@ -332,6 +364,7 @@ Future Evolution:
     audit/
     auth/
     notifications/
+```
 
 Each module:
 
@@ -405,11 +438,11 @@ one authoritative owner.
 
 Example:
 
-Entity	Owner
-invoices	billing
-stock	inventory
-ledgers	accounting
-users	auth
+Entity Owner
+invoices billing
+stock inventory
+ledgers accounting
+users auth
 10.3 CONSISTENCY MODEL
 
 Strong consistency required for:
@@ -474,7 +507,7 @@ automation plugins
 
 Core Principle:
 
-“Core platform stable, extensions flexible.”
+   Core platform stable, extensions flexible.   
 
 14. PERFORMANCE GOALS
 
@@ -533,7 +566,7 @@ extract later only when necessary.
 
 Core Principle:
 
-“Architect for extraction, not distribution.”
+   Architect for extraction, not distribution.   
 
 17. OPERATIONAL PHILOSOPHY
 

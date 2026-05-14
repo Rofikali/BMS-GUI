@@ -41,7 +41,7 @@ Plugins must:
 
 Core Principle:
 
-> “Stable core, flexible extensions.”
+> Stable core, flexible extensions. 
 
 ---
 
@@ -55,7 +55,7 @@ Plugins must NEVER:
 
 Core Principle:
 
-> “Extensions must fail in isolation.”
+> Extensions must fail in isolation. 
 
 ---
 
@@ -161,20 +161,13 @@ Future-compatible architecture for:
 
 ```text
 Plugin Discovery
-    ?
-Manifest Validation
-    ?
-ABI Compatibility Check
-    ?
-Capability Validation
-    ?
-Sandbox Initialization
-    ?
-Plugin Load
-    ?
-Lifecycle Registration
-    ?
-Runtime Execution
+    -> Manifest Validation
+    -> ABI Compatibility Check
+    -> Capability Validation
+    -> Sandbox Initialization
+    -> Plugin Load
+    -> Lifecycle Registration
+    -> Runtime Execution
 ```
 
 ---
@@ -250,7 +243,7 @@ Every plugin requires:
 
 ## Core Principle
 
-> “ABI compatibility must be explicit and validated.”
+> ABI compatibility must be explicit and validated. 
 
 ---
 
@@ -485,12 +478,9 @@ the internal event system.
 
 ```text
 Core Event
-    ?
-EventBus
-    ?
-Plugin Subscriber
-    ?
-Plugin Handler
+    -> EventBus
+    -> Plugin Subscriber
+    -> Plugin Handler
 ```
 
 ---
@@ -499,9 +489,9 @@ Plugin Handler
 
 ```text
 SALE_COMPLETED
-    ?
+    ->
 analytics_plugin
-    ?
+    ->
 custom KPI generation
 ```
 
@@ -597,14 +587,10 @@ Need:
 
 ```text
 Plugin Crash
-    ?
-Isolation Trigger
-    ?
-Crash Logging
-    ?
-Plugin Disable
-    ?
-Operator Notification
+    -> Isolation Trigger
+    -> Crash Logging
+    -> Plugin Disable
+    -> Operator Notification
 ```
 
 ---
@@ -754,9 +740,9 @@ plugin hot reload.
 
 ```text
 Unload
-? Validate
-? Reload
-? Restore State
+-> Validate
+-> Reload
+-> Restore State
 ```
 
 ---

@@ -34,7 +34,7 @@ Primary Goals:
 
 Core Principle:
 
-> “Build a modular monolith first, but design module boundaries as future services.”
+> Build a modular monolith first, but design module boundaries as future services. 
 
 ---
 
@@ -197,30 +197,30 @@ Modules must NEVER:
 
 ```text
 /project-root
-¦
+ 
 +-- /apps
-¦   +-- desktop_app
-¦
+    +-- desktop_app
+ 
 +-- /core
-¦   +-- /storage
-¦   +-- /events
-¦   +-- /accounting
-¦   +-- /inventory
-¦   +-- /billing
-¦   +-- /security
-¦   +-- /audit
-¦   +-- /plugins
-¦   +-- /analytics
-¦   +-- /reports
-¦
+    +-- /storage
+    +-- /events
+    +-- /accounting
+    +-- /inventory
+    +-- /billing
+    +-- /security
+    +-- /audit
+    +-- /plugins
+    +-- /analytics
+    +-- /reports
+ 
 +-- /native
-¦   +-- /wal
-¦   +-- /btree
-¦   +-- /memory
-¦   +-- /checksum
-¦   +-- /simd
-¦   +-- /storage
-¦
+    +-- /wal
+    +-- /btree
+    +-- /memory
+    +-- /checksum
+    +-- /simd
+    +-- /storage
+ 
 +-- /plugins
 +-- /tests
 +-- /docs
@@ -448,7 +448,7 @@ Transaction
 
 # 11.3 DOUBLE ENTRY VALIDATION
 
-:contentReference[oaicite:0]{index=0}
+Assets = Liabilities + Equity
 
 ---
 
@@ -619,7 +619,7 @@ Root
 
 # 15.2 SEARCH COMPLEXITY
 
-:contentReference[oaicite:1]{index=1}
+Total Debits = Total Credits
 
 ---
 

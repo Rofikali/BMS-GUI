@@ -1,7 +1,12 @@
 # EVENT_CATALOG.md
+
 # INDUSTRY-GRADE BUSINESS OPERATING PLATFORM
+
 ## Complete Event Catalog & Event-Driven Architecture
+
 ### Principal Engineer + SRE + CA + MBA Perspective
+
+Versioned event schema authority: `EVENT_SCHEMAS.md`.
 
 ---
 
@@ -12,6 +17,7 @@ The platform follows an:
 > Internal Event-Driven Modular Architecture.
 
 Events enable:
+
 - loose coupling,
 - modular scalability,
 - async workflows,
@@ -20,7 +26,7 @@ Events enable:
 
 Core Principle:
 
-> “Modules communicate through events and contracts, not direct internal mutations.”
+> Modules communicate through events and contracts, not direct internal mutations.
 
 ---
 
@@ -30,14 +36,11 @@ Core Principle:
 
 ```text
 Publisher
-    ?
-Event Queue
-    ?
-Dispatcher
-    ?
-Subscribers
-    ?
-Handlers
+    -> Event Queue
+    -> Dispatcher
+    -> Subscribers
+    -> Handlers
+```
 
 3. EVENT DESIGN PRINCIPLES
 3.1 IMMUTABLE EVENTS
@@ -73,7 +76,7 @@ version-controls event schemas.
 
 Modules must NEVER:
 
-directly mutate another module’s internal state.
+directly mutate another module s internal state.
 
 They communicate through:
 
@@ -100,19 +103,19 @@ typedef struct {
     Payload payload;
 } Event;
 5. EVENT PRIORITY LEVELS
-Priority	Purpose
-CRITICAL	recovery/accounting failures
-HIGH	financial/business operations
-NORMAL	operational workflows
-LOW	analytics/telemetry
+Priority Purpose
+CRITICAL recovery/accounting failures
+HIGH financial/business operations
+NORMAL operational workflows
+LOW analytics/telemetry
 6. EVENT DELIVERY GUARANTEES
 Required Guarantees
-Guarantee	Requirement
-ordered delivery	same stream
-durable events	critical workflows
-retry support	transient failures
-idempotency	safe reprocessing
-async delivery	non-blocking UI
+Guarantee Requirement
+ordered delivery same stream
+durable events critical workflows
+retry support transient failures
+idempotency safe reprocessing
+async delivery non-blocking UI
 7. EVENT CATEGORIES
 SYSTEM EVENTS
 BUSINESS EVENTS
@@ -732,11 +735,11 @@ audit inspection
 
 Event retention categories:
 
-Type	Retention
-accounting	permanent
-audit	permanent
-analytics	configurable
-notifications	temporary
+Type Retention
+accounting permanent
+audit permanent
+analytics configurable
+notifications temporary
 24. EVENT OBSERVABILITY
 
 Need:
@@ -747,12 +750,12 @@ replay diagnostics
 queue metrics
 handler latency monitoring
 Key Metrics
-Metric	Purpose
-queue depth	bottleneck detection
-event latency	performance
-retry count	reliability
-handler failures	stability
-dropped events	operational health
+Metric Purpose
+queue depth bottleneck detection
+event latency performance
+retry count reliability
+handler failures stability
+dropped events operational health
 25. EVENT FAILURE STRATEGY
 Retryable Failures
 

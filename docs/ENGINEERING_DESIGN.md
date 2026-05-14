@@ -1,6 +1,9 @@
 # DSA_ALGORITHMS_DESIGN_PATTERNS_COMPLEXITY.md
+
 # INDUSTRY-GRADE ENGINEERING BLUEPRINT
+
 ## DSA, Algorithms, Design Patterns, Complexity & Real Codebase Architecture
+
 ### Principal Engineer + SRE + CA + MBA Perspective
 
 ---
@@ -22,11 +25,13 @@ This document defines:
 for the complete business operating platform.
 
 This is NOT:
+
 - interview preparation,
 - textbook theory,
 - isolated examples.
 
 This is:
+
 - production engineering,
 - systems architecture,
 - reliability engineering,
@@ -43,9 +48,10 @@ This is:
 
 Core Principle:
 
-> “Choose the simplest architecture that survives future scale.”
+> Choose the simplest architecture that survives future scale.   
 
 DSA & algorithms are selected based on:
+
 - latency
 - determinism
 - cache efficiency
@@ -58,12 +64,14 @@ DSA & algorithms are selected based on:
 ## 2.2 SRE VIEW
 
 Algorithms must support:
+
 - operational predictability
 - graceful degradation
 - recovery safety
 - deterministic performance
 
 Avoid:
+
 - unbounded memory growth
 - unpredictable runtimes
 - algorithmic explosions
@@ -73,17 +81,19 @@ Avoid:
 ## 2.3 CA VIEW
 
 Accounting algorithms prioritize:
+
 - correctness
 - auditability
 - determinism
 
-Financial correctness > raw speed.
+Financial correctness>raw speed.
 
 ---
 
 ## 2.4 MBA VIEW
 
 Engineering decisions must optimize:
+
 - operational efficiency
 - maintainability cost
 - scalability ROI
@@ -98,10 +108,12 @@ Engineering decisions must optimize:
 # 3.1 LOW-LEVEL CORE
 
 Languages:
+
 - C
 - Assembly (optional optimization)
 
 Responsibilities:
+
 - storage engine
 - WAL
 - indexing
@@ -114,9 +126,11 @@ Responsibilities:
 # 3.2 HIGH-LEVEL LAYER
 
 Language:
+
 - Python 3.x
 
 Responsibilities:
+
 - business workflows
 - reporting
 - analytics
@@ -128,12 +142,14 @@ Responsibilities:
 # 3.3 UI LAYER
 
 Options:
+
 - Qt (PySide6)
 - Tauri
 - Native Win32
 - Dear ImGui (admin/debug tools)
 
 Recommended:
+
 ```text
 PySide6 + C Core DLL
 ```
@@ -163,7 +179,7 @@ Choose DSA based on:
 
 Core Principle:
 
-> “Memory layout matters more than clever code.”
+> Memory layout matters more than clever code.   
 
 ---
 
@@ -176,6 +192,7 @@ Core Principle:
 ## Usage
 
 Used for:
+
 - invoice items
 - inventory lists
 - event buffers
@@ -210,6 +227,7 @@ typedef struct {
 ## Usage
 
 Used for:
+
 - inventory lookup
 - invoice cache
 - session tracking
@@ -226,6 +244,7 @@ Used for:
 | delete | O(1) average |
 
 Worst case:
+
 ```text
 O(n)
 ```
@@ -248,6 +267,7 @@ typedef struct {
 ## Usage
 
 Used for:
+
 - ledger indexes
 - invoice indexing
 - storage engine
@@ -258,6 +278,7 @@ Used for:
 ## Why B-Tree?
 
 Optimized for:
+
 - disk access
 - large datasets
 - ordered traversal
@@ -288,6 +309,7 @@ Optimized for:
 ## Usage
 
 Used for:
+
 - event bus
 - logging
 - metrics
@@ -298,6 +320,7 @@ Used for:
 ## Why?
 
 Benefits:
+
 - cache friendly
 - bounded memory
 - predictable performance
@@ -333,10 +356,12 @@ typedef struct {
 LIMITED usage only.
 
 Used for:
+
 - plugin chains
 - internal allocators
 
 Avoid excessive usage because:
+
 - cache misses
 - fragmentation
 - pointer overhead
@@ -358,6 +383,7 @@ Avoid excessive usage because:
 ## Usage
 
 Used for:
+
 - parsers
 - undo/redo
 - recursive workflows
@@ -378,6 +404,7 @@ Used for:
 ## Usage
 
 Used for:
+
 - job scheduling
 - async processing
 - event pipelines
@@ -398,6 +425,7 @@ Used for:
 ## Usage
 
 Used for:
+
 - scheduling
 - analytics ranking
 - task prioritization
@@ -484,7 +512,7 @@ B-Tree traversal.
 
 ## Complexity
 
-:contentReference[oaicite:0]{index=0}
+Assets = Liabilities + Equity
 
 ---
 
@@ -496,7 +524,7 @@ B-Tree traversal.
 
 ## Formula
 
-:contentReference[oaicite:1]{index=1}
+Total Debits = Total Credits
 
 ---
 
@@ -528,7 +556,7 @@ Aggregate ledger balances.
 
 ## Formula
 
-:contentReference[oaicite:2]{index=2}
+Assets = Liabilities + Equity
 
 ---
 
@@ -573,7 +601,7 @@ O(1)
 
 ## Pattern
 
-Publisher ? EventBus ? Subscriber
+Publisher -> EventBus -> Subscriber
 
 ---
 
@@ -619,6 +647,7 @@ Exponential backoff retry.
 ## Usage
 
 Used for:
+
 - temporary allocations
 - parsers
 - event processing
@@ -637,6 +666,7 @@ Used for:
 ## Why?
 
 Benefits:
+
 - minimal fragmentation
 - deterministic allocation
 - high performance
@@ -681,6 +711,7 @@ Fixed-size object allocation.
 ## Usage
 
 Used for:
+
 - logging
 - metrics
 - event dispatching
@@ -727,7 +758,7 @@ Sorted indexes.
 
 ## Complexity
 
-:contentReference[oaicite:3]{index=3}
+Revenue - Expenses = Net Profit or Loss
 
 ---
 
@@ -809,7 +840,7 @@ Internal high-speed sorting.
 | Case | Complexity |
 |---|---|
 | average | O(n log n) |
-| worst | O(n²) |
+| worst | O(n   ) |
 
 ---
 
@@ -828,6 +859,7 @@ Stable sorting requirements.
 | sort | O(n log n) |
 
 Space:
+
 ```text
 O(n)
 ```
@@ -879,8 +911,8 @@ EventBus system.
 
 ```text
 Publisher
-? EventBus
-? Subscribers
+-> EventBus
+-> Subscribers
 ```
 
 ---
@@ -1041,9 +1073,9 @@ Validation pipeline.
 
 ```text
 Input
-? Validation
-? Authorization
-? Processing
+-> Validation
+-> Authorization
+-> Processing
 ```
 
 ---
@@ -1053,6 +1085,7 @@ Input
 ## Usage
 
 Separate:
+
 - read workloads
 - write workloads
 
@@ -1094,10 +1127,8 @@ Modular internals.
 
 ```text
 Core Domain
-?
-Ports
-?
-Adapters
+-> Ports
+-> Adapters
 ```
 
 ---
@@ -1119,6 +1150,7 @@ Adapters
 # 15.1 STRUCT OF ARRAYS (SoA)
 
 Preferred for:
+
 - analytics
 - inventory processing
 
@@ -1138,6 +1170,7 @@ typedef struct {
 # 15.2 ARRAY OF STRUCTS (AoS)
 
 Used for:
+
 - entity modeling
 
 ---
@@ -1149,6 +1182,7 @@ Used for:
 # 16.1 USE CASES
 
 Assembly only for:
+
 - checksum acceleration
 - SIMD parsing
 - memory copy optimization
@@ -1177,7 +1211,7 @@ Assembly only for:
 | O(log n) | excellent |
 | O(n) | acceptable |
 | O(n log n) | acceptable |
-| O(n²) | avoid |
+| O(n   ) | avoid |
 | O(2n) | forbidden |
 
 ---
@@ -1186,7 +1220,7 @@ Assembly only for:
 
 Core Principle:
 
-> “Avoid hidden quadratic behavior.”
+> Avoid hidden quadratic behavior.   
 
 ---
 
@@ -1197,6 +1231,7 @@ Core Principle:
 # 18.1 MEMORY RULES
 
 Need:
+
 - bounded memory
 - predictable allocations
 - minimal fragmentation
@@ -1207,12 +1242,9 @@ Need:
 
 ```text
 Stack
-?
-Arena
-?
-Pool
-?
-Heap (minimal)
+-> Arena
+-> Pool
+-> Heap (minimal)
 ```
 
 ---
@@ -1278,6 +1310,7 @@ Heap (minimal)
 # 20.1 HOT PATH RULES
 
 Optimize:
+
 - WAL append
 - indexing
 - inventory lookup
@@ -1288,6 +1321,7 @@ Optimize:
 # 20.2 COLD PATH RULES
 
 Do NOT prematurely optimize:
+
 - reports
 - admin tools
 - setup screens
@@ -1297,12 +1331,14 @@ Do NOT prematurely optimize:
 # 21. FUTURE SCALABILITY
 
 Architecture already supports:
+
 - module extraction
 - service decomposition
 - distributed analytics
 - remote synchronization
 
 because boundaries are:
+
 - event-driven
 - API-driven
 - storage-isolated
@@ -1347,6 +1383,7 @@ This engineering architecture establishes:
 - future extensibility.
 
 Core engineering goals:
+
 - performance
 - maintainability
 - observability

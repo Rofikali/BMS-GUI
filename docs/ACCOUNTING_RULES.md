@@ -3,6 +3,8 @@
 ## Accounting Rules, Financial Integrity & Ledger Architecture
 ### Principal Engineer + SRE + CA + MBA Perspective
 
+Implementation-grade accounting contract: `ACCOUNTING_SPEC.md`.
+
 ---
 
 # 1. ACCOUNTING SYSTEM OVERVIEW
@@ -31,7 +33,7 @@ Accounting is:
 
 Core Principle:
 
-> “Every business event must produce financial impact.”
+> Every business event must produce financial impact. 
 
 Every:
 - sale,
@@ -60,7 +62,7 @@ Accounting must remain:
 
 Core Principle:
 
-> “Financial correctness is more important than feature velocity.”
+> Financial correctness is more important than feature velocity. 
 
 ---
 
@@ -121,7 +123,7 @@ Cash A/C              Dr   1000
 
 Core accounting equation:
 
-:contentReference[oaicite:0]{index=0}
+Assets = Liabilities + Equity
 
 The system must NEVER violate:
 this equation.
@@ -210,7 +212,7 @@ DEBIT
 
 # 4.3 EQUITY
 
-Owner’s residual interest.
+Owner s residual interest.
 
 Examples:
 - capital
@@ -396,7 +398,7 @@ validate accounting integrity.
 
 # 8.1 CORE RULE
 
-:contentReference[oaicite:1]{index=1}
+Total Debits = Total Credits
 
 ---
 
@@ -594,22 +596,14 @@ The system must generate:
 
 ```text
 Business Action
-    ?
-Validation
-    ?
-Journal Creation
-    ?
-Double Entry Validation
-    ?
-WAL Append
-    ?
-Ledger Posting
-    ?
-Trial Balance Check
-    ?
-Audit Record
-    ?
-Analytics Update
+    -> Validation
+    -> Journal Creation
+    -> Double Entry Validation
+    -> WAL Append
+    -> Ledger Posting
+    -> Trial Balance Check
+    -> Audit Record
+    -> Analytics Update
 ```
 
 ---
@@ -622,16 +616,11 @@ Analytics Update
 
 ```text
 SALE_COMPLETED
-    ?
-Accounting Mapper
-    ?
-Journal Entry
-    ?
-Ledger Update
-    ?
-TRIAL_BALANCE_CHECK
-    ?
-AUDIT_EVENT_CREATED
+    -> Accounting Mapper
+    -> Journal Entry
+    -> Ledger Update
+    -> TRIAL_BALANCE_CHECK
+    -> AUDIT_EVENT_CREATED
 ```
 
 ---
@@ -770,7 +759,7 @@ Expense Reports
 
 The balance sheet must ALWAYS satisfy:
 
-:contentReference[oaicite:2]{index=2}
+Assets = Liabilities + Equity
 
 If violated:
 system enters:
@@ -783,7 +772,7 @@ system enters:
 
 P&L computes:
 
-:contentReference[oaicite:3]{index=3}
+Revenue - Expenses = Net Profit or Loss
 
 ---
 

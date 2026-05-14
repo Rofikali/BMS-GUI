@@ -3,6 +3,8 @@
 ## Complete Module Architecture Map
 ### Principal Engineer + SRE + CA + MBA Perspective
 
+Implementation ownership authority: `DOMAIN_CONTRACTS.md`.
+
 ---
 
 # 1. MODULE ARCHITECTURE OVERVIEW
@@ -20,7 +22,7 @@ Each module:
 
 Core Principle:
 
-> “Modules communicate through contracts and events, not direct internals.”
+> Modules communicate through contracts and events, not direct internals. 
 
 ---
 
@@ -57,6 +59,7 @@ Core Principle:
     transactions/
     users/
     wal/
+```
 
 
 
@@ -682,14 +685,14 @@ storage
 13. MODULE DEPENDENCY RULES
 Allowed
 GUI
-? Application
-? Domain
-? Infrastructure
+-> Application
+-> Domain
+-> Infrastructure
 Forbidden
-GUI ? STORAGE
-GUI ? WAL
-GUI ? ACCOUNTING INTERNALS
-MODULE ? OTHER MODULE INTERNAL STORAGE
+GUI -> STORAGE
+GUI -> WAL
+GUI -> ACCOUNTING INTERNALS
+MODULE -> OTHER MODULE INTERNAL STORAGE
 14. EVENT OWNERSHIP RULES
 
 Every module:

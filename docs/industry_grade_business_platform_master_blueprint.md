@@ -109,30 +109,30 @@ Microservice-ready internal boundaries
 # 4. SYSTEM LAYERS
 
 ```text
-┌───────────────────────────┐
-│         GUI Layer         │
-│     PySide6 Desktop UI    │
-└─────────────┬─────────────┘
-              │
-┌─────────────▼─────────────┐
-│      Application Layer    │
-│  Workflow / Orchestration │
-└─────────────┬─────────────┘
-              │
-┌─────────────▼─────────────┐
-│        Domain Layer       │
-│ Business Rules / Services │
-└─────────────┬─────────────┘
-              │
-┌─────────────▼─────────────┐
-│      Native Core Layer    │
-│    C / ASM Components     │
-└─────────────┬─────────────┘
-              │
-┌─────────────▼─────────────┐
-│      Storage Layer        │
-│ WAL / Snapshots / Files   │
-└───────────────────────────┘
+                                                                                       
+            GUI Layer            
+        PySide6 Desktop UI       
+                                                                                       
+                 
+                                                                                       
+         Application Layer       
+     Workflow / Orchestration    
+                                                                                       
+                 
+                                                                                       
+           Domain Layer          
+    Business Rules / Services    
+                                                                                       
+                 
+                                                                                       
+         Native Core Layer       
+       C / ASM Components        
+                                                                                       
+                 
+                                                                                       
+         Storage Layer           
+    WAL / Snapshots / Files      
+                                                                                       
 ```
 
 ---
@@ -183,27 +183,27 @@ Microservice-ready internal boundaries
 
 ```text
 USER ACTION
-    ↓
+       
 GUI LAYER
-    ↓
+       
 APPLICATION SERVICE
-    ↓
+       
 DOMAIN VALIDATION
-    ↓
+       
 DOMAIN EXECUTION
-    ↓
+       
 EVENT CREATION
-    ↓
+       
 TRANSACTION ENGINE
-    ↓
+       
 WAL WRITE
-    ↓
+       
 STATE UPDATE
-    ↓
+       
 AUDIT ENTRY
-    ↓
+       
 ANALYTICS UPDATE
-    ↓
+       
 NOTIFICATION EVENT
 ```
 
@@ -213,33 +213,33 @@ NOTIFICATION EVENT
 
 ```text
 Cashier Action
-    ↓
+       
 GUI Form
-    ↓
+       
 Billing Service
-    ↓
+       
 Input Validation
-    ↓
+       
 Inventory Availability Check
-    ↓
+       
 Pricing Engine
-    ↓
+       
 Tax Engine
-    ↓
+       
 Accounting Engine
-    ↓
+       
 Transaction Creation
-    ↓
+       
 WAL Append
-    ↓
+       
 Invoice Persistence
-    ↓
+       
 Inventory Reduction
-    ↓
+       
 Audit Log Entry
-    ↓
+       
 Event Publication
-    ↓
+       
 Receipt Generation
 ```
 
@@ -249,19 +249,19 @@ Receipt Generation
 
 ```text
 Business Event
-    ↓
+       
 Accounting Mapper
-    ↓
+       
 Journal Entry Generator
-    ↓
+       
 Double Entry Validation
-    ↓
+       
 Ledger Update
-    ↓
+       
 Trial Balance Check
-    ↓
+       
 Persistence
-    ↓
+       
 Audit Entry
 ```
 
@@ -280,25 +280,25 @@ Audit Entry
 
 ```text
 Stock Operation
-    ↓
+       
 Validation
-    ↓
+       
 Inventory Service
-    ↓
+       
 Quantity Verification
-    ↓
+       
 Reservation/Allocation
-    ↓
+       
 Movement Record
-    ↓
+       
 WAL Write
-    ↓
+       
 Inventory Snapshot Update
-    ↓
+       
 Low Stock Detection
-    ↓
+       
 Analytics Update
-    ↓
+       
 Audit Event
 ```
 
@@ -336,10 +336,10 @@ Audit Event
 
 ```text
 Operation
-→ WAL Append
-→ Flush
-→ Commit State
-→ Mark Complete
+    WAL Append
+    Flush
+    Commit State
+    Mark Complete
 ```
 
 ## WAL Guarantees
@@ -357,9 +357,9 @@ Operation
 
 ```text
 Publisher
-→ Event Queue
-→ Dispatcher
-→ Subscribers
+    Event Queue
+    Dispatcher
+    Subscribers
 ```
 
 ## Event Types
@@ -406,12 +406,12 @@ backup_plugin.py
 
 ```text
 DISCOVER
-→ VALIDATE
-→ LOAD
-→ INITIALIZE
-→ REGISTER
-→ RUN
-→ SHUTDOWN
+    VALIDATE
+    LOAD
+    INITIALIZE
+    REGISTER
+    RUN
+    SHUTDOWN
 ```
 
 ## Plugin Rules
@@ -458,11 +458,11 @@ Background Scheduler
 
 ```text
 Stack Memory
-↓
+   
 Arena Allocators
-↓
+   
 Memory Pools
-↓
+   
 Heap (minimal)
 ```
 
@@ -545,11 +545,11 @@ VIEWER
 
 ```text
 Business Action
-→ Audit Event
-→ Immutable Log
-→ Timestamp
-→ User ID
-→ Before/After State
+    Audit Event
+    Immutable Log
+    Timestamp
+    User ID
+    Before/After State
 ```
 
 ## Audit Principles
@@ -567,9 +567,9 @@ Business Action
 
 ```text
 Business Events
-→ Aggregation Engine
-→ KPI Models
-→ Dashboard
+    Aggregation Engine
+    KPI Models
+    Dashboard
 ```
 
 ## MBA Metrics
@@ -619,11 +619,11 @@ Business Events
 
 ```text
 Startup
-→ WAL Scan
-→ Corruption Check
-→ Transaction Replay
-→ Snapshot Recovery
-→ Integrity Validation
+    WAL Scan
+    Corruption Check
+    Transaction Replay
+    Snapshot Recovery
+    Integrity Validation
 ```
 
 ---
@@ -742,7 +742,7 @@ Future extraction example:
 
 ```text
 inventory module
-→ inventory-service
+    inventory-service
 ```
 
 Minimal rewrite required.

@@ -1,6 +1,12 @@
 # ARCHITECTURE.md
+
 # INDUSTRY-GRADE BUSINESS OPERATING PLATFORM ARCHITECTURE
+
 ## Principal Engineer + SRE + CA + MBA Architecture Blueprint
+
+Canonical source of truth: `PLATFORM_SPEC.md`.
+
+Implementation boundaries: `MVP_SCOPE.md`, `DOMAIN_CONTRACTS.md`, `INVARIANTS.md`.
 
 ---
 
@@ -13,6 +19,7 @@ Build a:
 > Modular, Offline-First, Event-Driven, Accounting-Correct, Native-Powered Business Operating Platform.
 
 The architecture is designed to:
+
 - survive long-term evolution,
 - remain operationally reliable,
 - support future scaling,
@@ -24,12 +31,15 @@ The architecture is designed to:
 # 2. PRIMARY ARCHITECTURE STYLE
 
 ## Primary Pattern
+
 Modular Monolith
 
 ## Internal Style
+
 Event-Driven Service-Oriented Modules
 
 ## Future Evolution
+
 Microservice-Extractable Architecture
 
 ---
@@ -46,6 +56,7 @@ A modular monolith is chosen because it provides:
 - faster development velocity
 
 while preserving:
+
 - module boundaries,
 - scalability,
 - future extraction paths.
@@ -59,6 +70,7 @@ while preserving:
 ## 4.1 PRINCIPAL ENGINEER PHILOSOPHY
 
 Focus:
+
 - long-term maintainability
 - modular boundaries
 - controlled complexity
@@ -68,13 +80,14 @@ Focus:
 
 Core Principle:
 
-> “Architect for extraction, not distribution.”
+> Architect for extraction, not distribution.
 
 ---
 
 ## 4.2 SRE PHILOSOPHY
 
 Focus:
+
 - reliability
 - observability
 - recovery
@@ -83,13 +96,14 @@ Focus:
 
 Core Principle:
 
-> “Systems must survive real operational failures.”
+> Systems must survive real operational failures.
 
 ---
 
 ## 4.3 CA PHILOSOPHY
 
 Focus:
+
 - accounting integrity
 - auditability
 - financial correctness
@@ -97,13 +111,14 @@ Focus:
 
 Core Principle:
 
-> “Every business transaction must generate accounting impact.”
+> Every business transaction must generate accounting impact.
 
 ---
 
 ## 4.4 MBA PHILOSOPHY
 
 Focus:
+
 - operational intelligence
 - profitability
 - process optimization
@@ -112,7 +127,7 @@ Focus:
 
 Core Principle:
 
-> “Business operations should be measurable and optimizable.”
+> Business operations should be measurable and optimizable.
 
 ---
 
@@ -120,29 +135,30 @@ Core Principle:
 
 ```text
 +---------------------------+
-¦         GUI Layer         ¦
-¦     PySide6 Desktop UI    ¦
+          GUI Layer          
+      PySide6 Desktop UI     
 +---------------------------+
-              ¦
-+-------------?-------------+
-¦      Application Layer    ¦
-¦  Workflow / Orchestration ¦
+               
++-------------+-------------+
+       Application Layer     
+   Workflow / Orchestration  
 +---------------------------+
-              ¦
-+-------------?-------------+
-¦        Domain Layer       ¦
-¦ Business Rules / Services ¦
+               
++-------------+-------------+
+         Domain Layer        
+  Business Rules / Services  
 +---------------------------+
-              ¦
-+-------------?-------------+
-¦      Native Core Layer    ¦
-¦    C / ASM Components     ¦
+               
++-------------+-------------+
+       Native Core Layer     
+     C / ASM Components      
 +---------------------------+
-              ¦
-+-------------?-------------+
-¦      Storage Layer        ¦
-¦ WAL / Snapshots / Files   ¦
+               
++-------------+-------------+
+       Storage Layer         
+  WAL / Snapshots / Files    
 +---------------------------+
+```
 
 6. LAYER RESPONSIBILITIES
 6.1 GUI LAYER
@@ -269,19 +285,19 @@ testability.
 9. MODULE COMMUNICATION MODEL
 Core Principle
 
-“Modules communicate through contracts and events, not internals.”
+ Modules communicate through contracts and events, not internals. 
 
 Modules must NEVER:
 
-directly mutate each other’s storage,
+directly mutate each other s storage,
 bypass APIs,
 depend on internal implementation details.
 10. EVENT-DRIVEN ARCHITECTURE
 Internal Event Pipeline
 Publisher
-? Event Queue
-? Dispatcher
-? Subscribers
+-> Event Queue
+-> Dispatcher
+-> Subscribers
 Event Categories
 BUSINESS EVENTS
 SYSTEM EVENTS
@@ -290,14 +306,10 @@ ERROR EVENTS
 PLUGIN EVENTS
 Example Event Flow
 SALE_COMPLETED
-    ?
-Inventory Update
-    ?
-Accounting Entry
-    ?
-Analytics Update
-    ?
-Audit Logging
+    -> Inventory Update
+    -> Accounting Entry
+    -> Analytics Update
+    -> Audit Logging
 
 Loose coupling enables:
 
@@ -307,28 +319,17 @@ future service extraction.
 11. DATA FLOW ARCHITECTURE
 Master Flow
 USER ACTION
-    ?
-GUI LAYER
-    ?
-APPLICATION SERVICE
-    ?
-DOMAIN VALIDATION
-    ?
-DOMAIN EXECUTION
-    ?
-EVENT CREATION
-    ?
-TRANSACTION ENGINE
-    ?
-WAL WRITE
-    ?
-STATE UPDATE
-    ?
-AUDIT ENTRY
-    ?
-ANALYTICS UPDATE
-    ?
-NOTIFICATION EVENT
+    -> GUI LAYER
+    -> APPLICATION SERVICE
+    -> DOMAIN VALIDATION
+    -> DOMAIN EXECUTION
+    -> EVENT CREATION
+    -> TRANSACTION ENGINE
+    -> WAL WRITE
+    -> STATE UPDATE
+    -> AUDIT ENTRY
+    -> ANALYTICS UPDATE
+    -> NOTIFICATION EVENT
 12. COMMAND / QUERY SEPARATION
 Command Flow
 
@@ -343,10 +344,10 @@ process payment
 Flow:
 
 Command
-? Validation
-? Transaction
-? Persistence
-? Events
+-> Validation
+-> Transaction
+-> Persistence
+-> Events
 Query Flow
 
 Queries are read-only.
@@ -360,20 +361,20 @@ reports
 Flow:
 
 Query
-? Read Model
-? Response
+-> Read Model
+-> Response
 13. DATA OWNERSHIP MODEL
 
 Every entity has:
 ONE authoritative owner.
 
 Ownership Table
-Entity	Owner
-invoices	billing
-stock	inventory
-ledgers	accounting
-users	auth
-analytics	analytics
+Entity Owner
+invoices billing
+stock inventory
+ledgers accounting
+users auth
+analytics analytics
 
 Other modules must use:
 
@@ -406,10 +407,10 @@ schema versioning
 15. WAL ARCHITECTURE
 WAL Flow
 Operation
-? WAL Append
-? Flush
-? Commit State
-? Mark Complete
+-> WAL Append
+-> Flush
+-> Commit State
+-> Mark Complete
 
 Guarantees:
 
@@ -419,12 +420,12 @@ transactional safety.
 16. TRANSACTION ARCHITECTURE
 Transaction Lifecycle
 BEGIN
-? VALIDATE
-? EXECUTE
-? WAL
-? COMMIT
-? EVENTS
-? COMPLETE
+-> VALIDATE
+-> EXECUTE
+-> WAL
+-> COMMIT
+-> EVENTS
+-> COMPLETE
 Transaction Principles
 deterministic commits
 rollback support
@@ -437,16 +438,11 @@ a foundational subsystem.
 
 Accounting Flow
 Business Event
-    ?
-Accounting Mapper
-    ?
-Journal Entry Generator
-    ?
-Double Entry Validation
-    ?
-Ledger Update
-    ?
-Trial Balance Check
+    -> Accounting Mapper
+    -> Journal Entry Generator
+    -> Double Entry Validation
+    -> Ledger Update
+    -> Trial Balance Check
 Accounting Rules
 double-entry mandatory
 immutable ledgers
@@ -456,16 +452,11 @@ reconciliation support
 18. INVENTORY ARCHITECTURE
 Inventory Flow
 Stock Operation
-    ?
-Validation
-    ?
-Movement Record
-    ?
-WAL
-    ?
-Inventory Update
-    ?
-Analytics Event
+    -> Validation
+    -> Movement Record
+    -> WAL
+    -> Inventory Update
+    -> Analytics Event
 Inventory Rules
 no silent stock mutation
 movement history mandatory
@@ -474,11 +465,11 @@ low-stock detection support
 19. AUDIT ARCHITECTURE
 Audit Flow
 Business Action
-? Audit Event
-? Immutable Log
-? Timestamp
-? User ID
-? Before/After State
+-> Audit Event
+-> Immutable Log
+-> Timestamp
+-> User ID
+-> Before/After State
 Audit Principles
 immutable history
 operator traceability
@@ -513,12 +504,12 @@ analytics_plugin.py
 backup_plugin.py
 Plugin Lifecycle
 DISCOVER
-? VALIDATE
-? LOAD
-? INITIALIZE
-? REGISTER
-? RUN
-? SHUTDOWN
+-> VALIDATE
+-> LOAD
+-> INITIALIZE
+-> REGISTER
+-> RUN
+-> SHUTDOWN
 Plugin Requirements
 ABI validation
 capability restrictions
@@ -549,12 +540,9 @@ minimal fragmentation
 predictable lifetime
 Allocation Strategy
 Stack
-?
-Arena Allocators
-?
-Memory Pools
-?
-Heap (minimal)
+-> Arena Allocators
+-> Memory Pools
+-> Heap (minimal)
 24. OBSERVABILITY ARCHITECTURE
 Observability Stack
 
@@ -566,20 +554,20 @@ tracing
 crash dumps
 diagnostics
 Key Metrics
-Metric	Purpose
-invoice latency	performance
-event queue depth	bottlenecks
-WAL replay time	recovery
-plugin crashes	extension stability
-memory usage	leak detection
+Metric Purpose
+invoice latency performance
+event queue depth bottlenecks
+WAL replay time recovery
+plugin crashes extension stability
+memory usage leak detection
 25. RECOVERY ARCHITECTURE
 Recovery Flow
 Startup
-? WAL Scan
-? Corruption Check
-? Transaction Replay
-? Snapshot Recovery
-? Integrity Validation
+-> WAL Scan
+-> Corruption Check
+-> Transaction Replay
+-> Snapshot Recovery
+-> Integrity Validation
 Recovery Goals
 automatic recovery
 deterministic restoration
@@ -588,10 +576,10 @@ operational continuity
 26. BACKUP ARCHITECTURE
 Backup Flow
 Pause Snapshot
-? Flush WAL
-? Create Archive
-? Checksum Validation
-? Resume
+-> Flush WAL
+-> Create Archive
+-> Checksum Validation
+-> Resume
 Backup Goals
 safe recovery
 rollback support
@@ -600,16 +588,16 @@ operational continuity
 27. ANALYTICS ARCHITECTURE
 Analytics Pipeline
 Business Events
-? Aggregation Engine
-? KPI Models
-? Dashboard
+-> Aggregation Engine
+-> KPI Models
+-> Dashboard
 MBA KPIs
-KPI	Purpose
-inventory turnover	efficiency
-gross margin	profitability
-dead stock ratio	waste
-customer retention	loyalty
-sales velocity	demand
+KPI Purpose
+inventory turnover efficiency
+gross margin profitability
+dead stock ratio waste
+customer retention loyalty
+sales velocity demand
 28. DEPLOYMENT ARCHITECTURE
 Production Structure
 /program
@@ -654,7 +642,7 @@ Microservice Extraction
 
 Core Principle:
 
-“Extract services only when operationally necessary.”
+ Extract services only when operationally necessary. 
 
 Because modules already have:
 
@@ -668,7 +656,7 @@ future extraction becomes easier.
 Example:
 
 inventory module
-? inventory-service
+-> inventory-service
 
 Minimal rewrite required.
 

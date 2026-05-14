@@ -49,7 +49,7 @@ from:
 
 Core Principle:
 
-> “Security must be built into architecture, not patched afterward.”
+> Security must be built into architecture, not patched afterward. 
 
 Security must exist in:
 - module boundaries
@@ -86,7 +86,7 @@ Financial systems require:
 
 Core Principle:
 
-> “Financial records must be provably trustworthy.”
+> Financial records must be provably trustworthy. 
 
 ---
 
@@ -163,18 +163,12 @@ Examples:
 
 ```text
 User Layer
-    ?
-RBAC Layer
-    ?
-API Validation Layer
-    ?
-Module Boundary Layer
-    ?
-Storage Security Layer
-    ?
-Audit Layer
-    ?
-Recovery Layer
+    -> RBAC Layer
+    -> API Validation Layer
+    -> Module Boundary Layer
+    -> Storage Security Layer
+    -> Audit Layer
+    -> Recovery Layer
 ```
 
 ---
@@ -197,16 +191,11 @@ Need:
 
 ```text
 Login Request
-    ?
-Credential Validation
-    ?
-RBAC Validation
-    ?
-Session Generation
-    ?
-Audit Event
-    ?
-Access Granted
+    -> Credential Validation
+    -> RBAC Validation
+    -> Session Generation
+    -> Audit Event
+    -> Access Granted
 ```
 
 ---
@@ -261,12 +250,9 @@ Sessions require:
 
 ```text
 Authenticate
-    ?
-Generate Session Token
-    ?
-Track Activity
-    ?
-Expire Session
+    -> Generate Session Token
+    -> Track Activity
+    -> Expire Session
 ```
 
 ---
@@ -288,7 +274,7 @@ Sessions must:
 
 Core Principle:
 
-> “Users should access only what they need.”
+> Users should access only what they need. 
 
 ---
 
@@ -342,7 +328,7 @@ Financial records must NEVER:
 
 # 9.2 ACCOUNTING VALIDATION RULE
 
-:contentReference[oaicite:0]{index=0}
+Assets = Liabilities + Equity
 
 Violation triggers:
 - diagnostics
@@ -355,7 +341,7 @@ Violation triggers:
 
 Accounting integrity requires:
 
-:contentReference[oaicite:1]{index=1}
+Total Debits = Total Credits
 
 ---
 
@@ -367,7 +353,7 @@ Accounting integrity requires:
 
 Core Principle:
 
-> “Every critical action must be traceable.”
+> Every critical action must be traceable. 
 
 ---
 
@@ -385,14 +371,10 @@ Critical operations require:
 
 ```text
 User Action
-    ?
-Authorization
-    ?
-Operation
-    ?
-Audit Event Creation
-    ?
-Immutable Storage
+    -> Authorization
+    -> Operation
+    -> Audit Event Creation
+    -> Immutable Storage
 ```
 
 ---
@@ -469,12 +451,9 @@ Need:
 
 ```text
 Validation
-    ?
-WAL Append
-    ?
-Checksum
-    ?
-Commit
+    -> WAL Append
+    -> Checksum
+    -> Commit
 ```
 
 ---
@@ -483,10 +462,8 @@ Commit
 
 ```text
 Corruption Detected
-    ?
-Read-Only Mode
-    ?
-Recovery Workflow
+    -> Read-Only Mode
+    -> Recovery Workflow
 ```
 
 ---
@@ -588,12 +565,9 @@ All inputs require:
 
 ```text
 Invalid Input
-    ?
-Reject Request
-    ?
-Generate Audit Event
-    ?
-Log Diagnostics
+    -> Reject Request
+    -> Generate Audit Event
+    -> Log Diagnostics
 ```
 
 ---
@@ -789,14 +763,10 @@ Need:
 
 ```text
 Threat Detection
-    ?
-Isolation
-    ?
-Diagnostics
-    ?
-Recovery
-    ?
-Audit Review
+    -> Isolation
+    -> Diagnostics
+    -> Recovery
+    -> Audit Review
 ```
 
 ---

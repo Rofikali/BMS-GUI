@@ -43,7 +43,7 @@ The testing system must validate:
 
 Core Principle:
 
-> “Architecture without verification is speculation.”
+> Architecture without verification is speculation. 
 
 Every subsystem must be:
 - testable,
@@ -116,12 +116,9 @@ The testing architecture must verify:
 
 ```text
 E2E Tests
-    ?
-Integration Tests
-    ?
-Module Tests
-    ?
-Unit Tests
+    -> Integration Tests
+    -> Module Tests
+    -> Unit Tests
 ```
 
 ---
@@ -198,9 +195,9 @@ verify module interaction correctness.
 ## Examples
 
 ```text
-sale ? accounting
-invoice ? inventory
-purchase ? ledger
+sale -> accounting
+invoice -> inventory
+purchase -> ledger
 ```
 
 ---
@@ -216,10 +213,10 @@ verify full operational workflows.
 
 ```text
 Create Invoice
-? Payment
-? Inventory Update
-? Ledger Update
-? GST Report
+-> Payment
+-> Inventory Update
+-> Ledger Update
+-> GST Report
 ```
 
 ---
@@ -291,7 +288,7 @@ Critical financial correctness validation.
 
 All accounting tests must validate:
 
-:contentReference[oaicite:0]{index=0}
+Assets = Liabilities + Equity
 
 ---
 
@@ -299,7 +296,7 @@ All accounting tests must validate:
 
 Accounting tests must verify:
 
-:contentReference[oaicite:1]{index=1}
+Total Debits = Total Credits
 
 ---
 
@@ -371,9 +368,9 @@ Need tests for:
 
 ```text
 Crash
-? WAL Replay
-? State Restore
-? Accounting Validation
+-> WAL Replay
+-> State Restore
+-> Accounting Validation
 ```
 
 ---
@@ -683,7 +680,7 @@ Simulate:
 
 Core Principle:
 
-> “The system must fail predictably.”
+> The system must fail predictably. 
 
 ---
 
@@ -805,7 +802,7 @@ Need:
 
 Core Principle:
 
-> “Meaningful tests matter more than artificial coverage.”
+> Meaningful tests matter more than artificial coverage. 
 
 ---
 
@@ -827,11 +824,11 @@ Before release:
 
 ```text
 Build
-? Test
-? Recovery Validation
-? Security Validation
-? Staging
-? Release
+-> Test
+-> Recovery Validation
+-> Security Validation
+-> Staging
+-> Release
 ```
 
 ---
