@@ -1,1 +1,1 @@
-"""Storage abstractions and implementations."""
+"""Storage adapters for BMS domain services."""

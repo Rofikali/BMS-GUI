@@ -22,6 +22,50 @@ class AccountingServiceTests(unittest.TestCase):
             self.assertEqual(trial_balance.debit_total_minor, 118000)
             self.assertEqual(trial_balance.credit_total_minor, 118000)
 
+    def test_ledger_balances_are_derived_from_durable_journal_lines(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            service = AccountingService(initialize_data_root(Path(temp_dir)))
+
+            service.post_journal(_cash_sale_command("JRN-LEDGER-1"))
+
+            balances = service.get_ledger_balances("FY2026-05")
+            self.assertEqual(balances["1000"].account_name, "Cash")
+            self.assertEqual(balances["1000"].debit_total_minor, 118000)
+            self.assertEqual(balances["1000"].credit_total_minor, 0)
+            self.assertEqual(balances["1000"].balance_minor, 118000)
+            self.assertEqual(balances["4000"].debit_total_minor, 0)
+            self.assertEqual(balances["4000"].credit_total_minor, 100000)
+            self.assertEqual(balances["4000"].balance_minor, 100000)
+            self.assertEqual(balances["2100"].credit_total_minor, 18000)
+            self.assertEqual(balances["2100"].balance_minor, 18000)
+
+    def test_ledger_balances_survive_service_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            service = AccountingService(initialize_data_root(root))
+            service.post_journal(_cash_sale_command("JRN-LEDGER-2"))
+
+            restarted = AccountingService(initialize_data_root(root))
+            balances = restarted.get_ledger_balances("FY2026-05")
+
+            self.assertEqual(balances["1000"].balance_minor, 118000)
+            self.assertEqual(balances["4000"].balance_minor, 100000)
+            self.assertEqual(balances["2100"].balance_minor, 18000)
+
+    def test_post_journal_writes_audit_record(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            service = AccountingService(initialize_data_root(Path(temp_dir)))
+
+            service.post_journal(_cash_sale_command("JRN-AUDIT-1"))
+
+            audit_payloads = service.store.read_payloads(service.store.audit_records)
+            self.assertEqual(service.store.core.verify_file(service.store.audit_records), 1)
+            self.assertEqual(audit_payloads[0]["action"], "accounting.journal_posted")
+            self.assertEqual(audit_payloads[0]["actor_id"], "usr_accountant")
+            self.assertEqual(audit_payloads[0]["target_type"], "journal")
+            self.assertEqual(audit_payloads[0]["target_id"], "JRN-AUDIT-1")
+            self.assertEqual(audit_payloads[0]["correlation_id"], "corr_JRN-AUDIT-1")
+
     def test_unbalanced_journal_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             service = AccountingService(initialize_data_root(Path(temp_dir)))
@@ -46,6 +90,45 @@ class AccountingServiceTests(unittest.TestCase):
 
             with self.assertRaisesRegex(AccountingError, "closed"):
                 service.post_journal(_cash_sale_command("JRN-4"))
+
+    def test_closed_period_survives_service_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            service = AccountingService(initialize_data_root(root))
+            service.post_journal(_cash_sale_command("JRN-4A"))
+            service.close_period(
+                "FY2026-05",
+                actor_id="usr_accountant",
+                closed_at="2026-05-14T01:00:00Z",
+                correlation_id="corr_close_FY2026_05",
+            )
+
+            restarted = AccountingService(initialize_data_root(root))
+
+            with self.assertRaisesRegex(AccountingError, "closed"):
+                restarted.post_journal(_cash_sale_command("JRN-4B"))
+
+            self.assertEqual(restarted.store.core.verify_file(restarted.store.periods), 1)
+
+    def test_close_period_writes_audit_record(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            service = AccountingService(initialize_data_root(Path(temp_dir)))
+            service.post_journal(_cash_sale_command("JRN-AUDIT-2"))
+            service.close_period(
+                "FY2026-05",
+                actor_id="usr_accountant",
+                closed_at="2026-05-14T01:00:00Z",
+                correlation_id="corr_close_FY2026_05",
+            )
+
+            audit_payloads = service.store.read_payloads(service.store.audit_records)
+
+            self.assertEqual(service.store.core.verify_file(service.store.audit_records), 2)
+            self.assertEqual(audit_payloads[1]["action"], "accounting.period_closed")
+            self.assertEqual(audit_payloads[1]["actor_id"], "usr_accountant")
+            self.assertEqual(audit_payloads[1]["target_type"], "accounting_period")
+            self.assertEqual(audit_payloads[1]["target_id"], "FY2026-05")
+            self.assertEqual(audit_payloads[1]["correlation_id"], "corr_close_FY2026_05")
 
     def test_unknown_account_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

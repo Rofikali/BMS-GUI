@@ -51,6 +51,18 @@ class JournalResult:
 
 
 @dataclass(frozen=True)
+class LedgerBalance:
+    period_id: str
+    account_code: str
+    account_name: str
+    account_type: AccountType
+    debit_total_minor: int
+    credit_total_minor: int
+    balance_minor: int
+    currency: str
+
+
+@dataclass(frozen=True)
 class TrialBalance:
     period_id: str
     debit_total_minor: int

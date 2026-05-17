@@ -9,25 +9,22 @@ from bms.core import AppendRecord, BmsCore, WalRecoveryResult
 
 
 class CoreFileStore:
+    """Thin Python repository facade over the native C durability core."""
+
     def __init__(self, data_root: Path, core: BmsCore | None = None) -> None:
         self.data_root = data_root
         self.core = core or BmsCore()
 
-    @property
-    def event_log(self) -> Path:
-        return self.data_root / "events" / "business_events.jsonl"
-
-    @property
-    def journal_entries(self) -> Path:
-        return self.data_root / "accounting" / "journal_entries.jsonl"
-
-    @property
-    def journal_lines(self) -> Path:
-        return self.data_root / "accounting" / "journal_lines.jsonl"
-
-    @property
-    def wal(self) -> Path:
-        return self.data_root / "wal" / "current.wal.jsonl"
+        self.wal = self.data_root / "wal" / "current.wal.jsonl"
+        self.business_events = self.data_root / "events" / "business_events.jsonl"
+        self.journal_entries = self.data_root / "accounting" / "journal_entries.jsonl"
+        self.journal_lines = self.data_root / "accounting" / "journal_lines.jsonl"
+        self.periods = self.data_root / "accounting" / "periods.jsonl"
+        self.items = self.data_root / "inventory" / "items.jsonl"
+        self.stock_movements = self.data_root / "inventory" / "stock_movements.jsonl"
+        self.invoices = self.data_root / "billing" / "invoices.jsonl"
+        self.invoice_lines = self.data_root / "billing" / "invoice_lines.jsonl"
+        self.audit_records = self.data_root / "audit" / "audit_records.jsonl"
 
     def append_record(
         self,
@@ -37,8 +34,10 @@ class CoreFileStore:
         correlation_id: str,
         idempotency_key: str,
         payload: dict[str, object],
+        *,
         record_id: str | None = None,
         created_at: str | None = None,
+        schema_version: int = 1,
     ) -> int:
         return self.core.append_record(
             path,
@@ -50,6 +49,7 @@ class CoreFileStore:
                 correlation_id=correlation_id,
                 idempotency_key=idempotency_key,
                 payload=payload,
+                schema_version=schema_version,
             ),
         )
 
@@ -58,32 +58,84 @@ class CoreFileStore:
         event_type: str,
         actor_id: str,
         payload: dict[str, object],
+        *,
         correlation_id: str | None = None,
         occurred_at: str | None = None,
+        idempotency_key: str | None = None,
     ) -> int:
-        now = occurred_at or _utc_now()
-        event_correlation_id = correlation_id or f"corr_{uuid4().hex}"
-        record_id = f"evt_{uuid4().hex}"
-        return self.core.append_record(
-            self.event_log,
-            AppendRecord(
-                record_id=record_id,
-                record_type="event.business",
-                created_at=now,
-                actor_id=actor_id,
-                correlation_id=event_correlation_id,
-                idempotency_key=f"{event_type}_{record_id}",
-                payload={
-                    "event_type": event_type,
-                    "occurred_at": now,
-                    "source_module": "app",
-                    "payload": payload,
-                },
-            ),
+        event_id = f"evt_{uuid4().hex}"
+        created_at = occurred_at or _utc_now()
+        return self.append_record(
+            self.business_events,
+            "event.business",
+            actor_id,
+            correlation_id or event_id,
+            idempotency_key or event_id,
+            {
+                "event_type": event_type,
+                "occurred_at": created_at,
+                **payload,
+            },
+            record_id=event_id,
+            created_at=created_at,
+        )
+
+
+    def append_audit_record(
+        self,
+        action: str,
+        actor_id: str,
+        target_type: str,
+        target_id: str,
+        correlation_id: str,
+        *,
+        occurred_at: str | None = None,
+        details: dict[str, object] | None = None,
+        idempotency_key: str | None = None,
+    ) -> int:
+        created_at = occurred_at or _utc_now()
+        record_id = f"aud_{action}_{target_id}"
+        return self.append_record(
+            self.audit_records,
+            "audit.record",
+            actor_id,
+            correlation_id,
+            idempotency_key or record_id,
+            {
+                "action": action,
+                "actor_id": actor_id,
+                "occurred_at": created_at,
+                "target_type": target_type,
+                "target_id": target_id,
+                "correlation_id": correlation_id,
+                "details": details or {},
+            },
+            record_id=record_id,
+            created_at=created_at,
         )
 
     def verify_business_events(self) -> int:
-        return self.core.verify_file(self.event_log)
+        return self.core.verify_file(self.business_events)
+
+    def wal_smoke_commit(self, actor_id: str = "usr_system") -> None:
+        transaction_id = f"txn_smoke_{uuid4().hex}"
+        created_at = _utc_now()
+        correlation_id = f"corr_{transaction_id}"
+        self.core.append_wal_pending(
+            self.wal,
+            transaction_id,
+            created_at,
+            actor_id,
+            correlation_id,
+            {"operation": "wal.smoke_commit"},
+        )
+        self.core.append_wal_committed(
+            self.wal,
+            transaction_id,
+            created_at,
+            actor_id,
+            correlation_id,
+        )
 
     def inspect_wal_startup(self, required_snapshot_path: Path | None = None) -> WalRecoveryResult:
         return self.core.inspect_wal_startup(self.wal, required_snapshot_path)
@@ -94,29 +146,20 @@ class CoreFileStore:
     def read_payloads(self, path: Path) -> list[dict[str, object]]:
         if not path.exists():
             return []
+
         self.core.verify_file(path)
         payloads: list[dict[str, object]] = []
-        with path.open("r", encoding="utf-8") as file:
-            for line in file:
-                if line.strip():
-                    payload = json.loads(line)["payload"]
-                    if isinstance(payload, dict):
-                        payloads.append(payload)
+        with path.open("r", encoding="utf-8") as records:
+            for line in records:
+                line = line.strip()
+                if not line:
+                    continue
+                envelope = json.loads(line)
+                payload = envelope.get("payload")
+                if not isinstance(payload, dict):
+                    raise ValueError(f"record in {path} has non-object payload")
+                payloads.append(payload)
         return payloads
-
-    def wal_smoke_commit(self, actor_id: str = "usr_admin") -> None:
-        now = _utc_now()
-        transaction_id = f"txn_{uuid4().hex}"
-        correlation_id = f"corr_{uuid4().hex}"
-        self.core.append_wal_pending(
-            self.wal,
-            transaction_id,
-            now,
-            actor_id,
-            correlation_id,
-            {"operation": "app.startup.smoke"},
-        )
-        self.core.append_wal_committed(self.wal, transaction_id, _utc_now(), actor_id, correlation_id)
 
 
 def _utc_now() -> str:

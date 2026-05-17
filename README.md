@@ -54,3 +54,11 @@ Run checksum-focused tests:
 ```bash
 ctest --test-dir build -R checksum --output-on-failure
 ```
+
+```all passed what should be next steps as a principle/stuff enginner
+Use pydantic if better as a stuff/principle enginner here
+cmake -S . -B build -G Ninja
+cmake --build build
+ctest --test-dir build --output-on-failure
+PYTHONPATH=src python3 -m unittest discover tests/unit
+```

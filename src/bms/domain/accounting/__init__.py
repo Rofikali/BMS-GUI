@@ -1,5 +1,5 @@
 """Accounting domain module."""
-from bms.domain.accounting.models import JournalLine, JournalResult, PostJournalCommand, TrialBalance
+from bms.domain.accounting.models import JournalLine, JournalResult, LedgerBalance, PostJournalCommand, TrialBalance
 from bms.domain.accounting.service import AccountingError, AccountingService
 
 __all__ = [
@@ -7,6 +7,7 @@ __all__ = [
     "AccountingService",
     "JournalLine",
     "JournalResult",
+    "LedgerBalance",
     "PostJournalCommand",
     "TrialBalance",
 ]
