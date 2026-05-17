@@ -284,6 +284,76 @@ static void test_wal_corruption_enters_protected_mode(void)
     remove_if_exists(path);
 }
 
+
+static void test_wal_recovery_rolls_back_only_uncommitted_pending(void)
+{
+    const char *path = "test_wal_recover_pending.jsonl";
+    unsigned long long valid_records = 0;
+    int decision = -1;
+
+    remove_if_exists(path);
+    remove_if_exists("test_wal_recover_pending.jsonl.recovering");
+
+    assert(bms_wal_append_pending(
+               path,
+               "txn_committed_keep",
+               "2026-05-14T00:00:00Z",
+               "usr_test",
+               "corr_keep",
+               "{\"operation\":\"invoice.create\"}") == BMS_OK);
+    assert(bms_wal_append_committed(
+               path,
+               "txn_committed_keep",
+               "2026-05-14T00:00:01Z",
+               "usr_test",
+               "corr_keep") == BMS_OK);
+    assert(bms_wal_append_pending(
+               path,
+               "txn_pending_drop",
+               "2026-05-14T00:00:02Z",
+               "usr_test",
+               "corr_drop",
+               "{\"operation\":\"invoice.create\"}") == BMS_OK);
+
+    assert(bms_wal_recover_startup(path, NULL, &decision) == BMS_OK);
+    assert(decision == BMS_WAL_RECOVERY_PENDING_ROLLBACK);
+    assert(bms_jsonl_verify_file(path, &valid_records) == BMS_OK);
+    assert(valid_records == 2);
+    assert(bms_wal_inspect_startup(path, NULL, &decision) == BMS_OK);
+    assert(decision == BMS_WAL_RECOVERY_CLEAN);
+
+    remove_if_exists(path);
+}
+
+static void test_wal_recovery_requires_snapshot_rebuild_for_committed_missing_snapshot(void)
+{
+    const char *path = "test_wal_recover_missing_snapshot.jsonl";
+    const char *snapshot = "test_wal_recover_missing_snapshot.snapshot.json";
+    int decision = -1;
+
+    remove_if_exists(path);
+    remove_if_exists(snapshot);
+
+    assert(bms_wal_append_pending(
+               path,
+               "txn_snapshot",
+               "2026-05-14T00:00:00Z",
+               "usr_test",
+               "corr_snapshot",
+               "{\"operation\":\"invoice.create\"}") == BMS_OK);
+    assert(bms_wal_append_committed(
+               path,
+               "txn_snapshot",
+               "2026-05-14T00:00:01Z",
+               "usr_test",
+               "corr_snapshot") == BMS_OK);
+
+    assert(bms_wal_recover_startup(path, snapshot, &decision) == BMS_ERR_RECOVERY_REQUIRED);
+    assert(decision == BMS_WAL_RECOVERY_COMMITTED_MISSING_SNAPSHOT);
+
+    remove_if_exists(path);
+}
+
 static void test_storage_and_wal_emit_observability(void)
 {
     const char *records_path = "test_observe_records.jsonl";
@@ -455,6 +525,8 @@ int main(void)
     test_wal_detects_pending_on_startup();
     test_wal_detects_committed_missing_snapshot();
     test_wal_corruption_enters_protected_mode();
+    test_wal_recovery_rolls_back_only_uncommitted_pending();
+    test_wal_recovery_requires_snapshot_rebuild_for_committed_missing_snapshot();
     test_storage_and_wal_emit_observability();
     test_payload_representation_difference();
     test_unicode_composed_vs_decomposed();

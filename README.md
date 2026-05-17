@@ -1,17 +1,56 @@
 # BMS-GUI
 
-Documentation starts at [docs/README.md](docs/README.md).
+BMS-GUI is an offline-first desktop business management system for retail and inventory-heavy businesses. The goal is not a simple billing app; it is an accounting-correct operating platform that can grow into a durable business, inventory, audit, and reporting system.
 
-The canonical product and engineering source of truth is [docs/PLATFORM_SPEC.md](docs/PLATFORM_SPEC.md).
+The product is designed from three perspectives:
 
-The MVP storage decision is file-based first, documented in [docs/ADR/0002-file-based-storage-for-mvp.md](docs/ADR/0002-file-based-storage-for-mvp.md) and [docs/FILE_STORAGE_SPEC.md](docs/FILE_STORAGE_SPEC.md).
+- CA: accounting correctness, auditability, reconciliation, tax readiness, and ledger integrity.
+- MBA: operational intelligence, profitability, inventory visibility, and business decision support.
+- Engineer: native durability, clear module boundaries, testable contracts, and long-term maintainability.
 
-Native core work starts in `core/`; Python and PySide6 are integration layers above the C API.
+## Architecture
 
+The platform starts as a modular monolith:
 
-cmake -S . -B build
+```text
+PySide6 UI -> Python services -> C API -> native C11 core -> file-based durable storage
+```
+
+Core storage and durability code lives in `core/` and is implemented in pure C11. Assembly is allowed only for narrow hot paths after profiling proves it is needed. Python and PySide6 sit above the native boundary and must not bypass the C durability path.
+
+MVP storage is file-based first, using append-only records, checksums, WAL support, and rebuildable read models. The decision is documented in [docs/ADR/0002-file-based-storage-for-mvp.md](docs/ADR/0002-file-based-storage-for-mvp.md) and [docs/FILE_STORAGE_SPEC.md](docs/FILE_STORAGE_SPEC.md).
+
+## Documentation
+
+Start at [docs/README.md](docs/README.md).
+
+The canonical product and engineering source of truth is [docs/PLATFORM_SPEC.md](docs/PLATFORM_SPEC.md). If other documents conflict with it, the platform spec wins until an ADR changes the decision.
+
+Useful entry points:
+
+- [docs/VISION.md](docs/VISION.md) - long-term mission and product ambition
+- [docs/MVP_SCOPE.md](docs/MVP_SCOPE.md) - first production-grade release boundary
+- [docs/IMPLEMENTATION_ROADMAP.md](docs/IMPLEMENTATION_ROADMAP.md) - first build order
+- [docs/FIRST_TEST_PLAN.md](docs/FIRST_TEST_PLAN.md) - first verification plan
+- [docs/BUSINESS_STRATEGY.md](docs/BUSINESS_STRATEGY.md) - target customer and business model
+
+## Build And Test
+
+Build the native core:
+
+```bash
+cmake -S . -B build -G Ninja
 cmake --build build
+```
+
+Run core tests:
+
+```bash
 ctest --test-dir build --output-on-failure
+```
 
-ctest -R checksum
+Run checksum-focused tests:
 
+```bash
+ctest --test-dir build -R checksum --output-on-failure
+```

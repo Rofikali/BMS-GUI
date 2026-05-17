@@ -10,6 +10,18 @@ from typing import Any
 
 BMS_OK = 0
 BMS_ERR_DUPLICATE_IDEMPOTENCY_KEY = 5
+BMS_ERR_RECOVERY_REQUIRED = 7
+
+BMS_WAL_RECOVERY_CLEAN = 0
+BMS_WAL_RECOVERY_PENDING_ROLLBACK = 1
+BMS_WAL_RECOVERY_COMMITTED_MISSING_SNAPSHOT = 2
+BMS_WAL_RECOVERY_PROTECTED_READ_ONLY = 3
+
+
+@dataclass(frozen=True)
+class WalRecoveryResult:
+    status: int
+    decision: int
 
 
 class BmsCoreError(RuntimeError):
@@ -119,6 +131,22 @@ class BmsCore:
         if status != BMS_OK:
             raise BmsCoreError("bms_wal_append_committed", status)
 
+    def inspect_wal_startup(self, wal_path: Path, required_snapshot_path: Path | None = None) -> WalRecoveryResult:
+        decision = ctypes.c_int(BMS_WAL_RECOVERY_CLEAN)
+        snapshot = str(required_snapshot_path).encode() if required_snapshot_path else None
+        status = self._lib.bms_wal_inspect_startup(str(wal_path).encode(), snapshot, ctypes.byref(decision))
+        if status not in (BMS_OK, BMS_ERR_RECOVERY_REQUIRED):
+            raise BmsCoreError("bms_wal_inspect_startup", status)
+        return WalRecoveryResult(status=int(status), decision=int(decision.value))
+
+    def recover_wal_startup(self, wal_path: Path, required_snapshot_path: Path | None = None) -> WalRecoveryResult:
+        decision = ctypes.c_int(BMS_WAL_RECOVERY_CLEAN)
+        snapshot = str(required_snapshot_path).encode() if required_snapshot_path else None
+        status = self._lib.bms_wal_recover_startup(str(wal_path).encode(), snapshot, ctypes.byref(decision))
+        if status not in (BMS_OK, BMS_ERR_RECOVERY_REQUIRED):
+            raise BmsCoreError("bms_wal_recover_startup", status)
+        return WalRecoveryResult(status=int(status), decision=int(decision.value))
+
     def _configure_api(self) -> None:
         self._lib.bms_jsonl_append_record.argtypes = [ctypes.c_char_p, ctypes.POINTER(_CBmsRecord)]
         self._lib.bms_jsonl_append_record.restype = ctypes.c_int
@@ -141,6 +169,18 @@ class BmsCore:
             ctypes.c_char_p,
         ]
         self._lib.bms_wal_append_committed.restype = ctypes.c_int
+        self._lib.bms_wal_inspect_startup.argtypes = [
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+            ctypes.POINTER(ctypes.c_int),
+        ]
+        self._lib.bms_wal_inspect_startup.restype = ctypes.c_int
+        self._lib.bms_wal_recover_startup.argtypes = [
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+            ctypes.POINTER(ctypes.c_int),
+        ]
+        self._lib.bms_wal_recover_startup.restype = ctypes.c_int
 
 
 def find_core_library() -> Path:
@@ -150,7 +190,7 @@ def find_core_library() -> Path:
         "darwin": ("libbms_core_python.dylib", "libbms_core.dylib"),
         "win32": ("bms_core_python.dll", "bms_core.dll"),
     }.get(sys.platform, ("libbms_core_python.so",))
-    search_roots = [root / "build", root]
+    search_roots = [root / "build-ninja", root / "build", root]
     for search_root in search_roots:
         for name in names:
             candidate = search_root / name

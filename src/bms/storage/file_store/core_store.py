@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from bms.core import AppendRecord, BmsCore
+from bms.core import AppendRecord, BmsCore, WalRecoveryResult
 
 
 class CoreFileStore:
@@ -84,6 +84,12 @@ class CoreFileStore:
 
     def verify_business_events(self) -> int:
         return self.core.verify_file(self.event_log)
+
+    def inspect_wal_startup(self, required_snapshot_path: Path | None = None) -> WalRecoveryResult:
+        return self.core.inspect_wal_startup(self.wal, required_snapshot_path)
+
+    def recover_wal_startup(self, required_snapshot_path: Path | None = None) -> WalRecoveryResult:
+        return self.core.recover_wal_startup(self.wal, required_snapshot_path)
 
     def read_payloads(self, path: Path) -> list[dict[str, object]]:
         if not path.exists():

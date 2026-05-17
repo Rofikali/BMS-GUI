@@ -19,6 +19,17 @@ BmsStatus bms_wal_inspect_startup_with_telemetry(
     int *recovery_decision,
     const BmsStorageTelemetry *telemetry
 );
+BmsStatus bms_wal_recover_startup(
+    const char *wal_path,
+    const char *required_snapshot_path,
+    int *recovery_decision
+);
+BmsStatus bms_wal_recover_startup_with_telemetry(
+    const char *wal_path,
+    const char *required_snapshot_path,
+    int *recovery_decision,
+    const BmsStorageTelemetry *telemetry
+);
 
 enum {
     BMS_WAL_RECOVERY_CLEAN = 0,
