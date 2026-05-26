@@ -6,6 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from bms.core import AppendRecord, BmsCore, WalRecoveryResult
+from bms.domain.events import validate_business_event_payload
 
 
 class CoreFileStore:
@@ -25,6 +26,8 @@ class CoreFileStore:
         self.invoices = self.data_root / "billing" / "invoices.jsonl"
         self.invoice_lines = self.data_root / "billing" / "invoice_lines.jsonl"
         self.audit_records = self.data_root / "audit" / "audit_records.jsonl"
+        self.users = self.data_root / "users" / "users.json"
+        self.roles = self.data_root / "users" / "roles.json"
 
     def append_record(
         self,
@@ -65,17 +68,21 @@ class CoreFileStore:
     ) -> int:
         event_id = f"evt_{uuid4().hex}"
         created_at = occurred_at or _utc_now()
+        event_payload = validate_business_event_payload(
+            event_type,
+            {
+                "event_type": event_type,
+                "occurred_at": created_at,
+                **payload,
+            },
+        )
         return self.append_record(
             self.business_events,
             "event.business",
             actor_id,
             correlation_id or event_id,
             idempotency_key or event_id,
-            {
-                "event_type": event_type,
-                "occurred_at": created_at,
-                **payload,
-            },
+            event_payload,
             record_id=event_id,
             created_at=created_at,
         )

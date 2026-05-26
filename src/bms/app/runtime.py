@@ -1,0 +1,52 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+from bms.app.auth import IdentityService
+from bms.app.bootstrap import initialize_data_root
+from bms.app.startup import StartupHealth, StartupHealthService, StartupState
+from bms.domain.accounting import AccountingService
+from bms.domain.billing import BillingService
+from bms.domain.inventory import InventoryService
+from bms.domain.reporting import ReportingService
+from bms.services import BackupService
+from bms.storage.file_store.core_store import CoreFileStore
+
+
+class ApplicationRuntimeError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class ApplicationRuntime:
+    store: CoreFileStore
+    startup_health: StartupHealth
+    inventory: InventoryService
+    accounting: AccountingService
+    billing: BillingService
+    reporting: ReportingService
+    backup: BackupService
+    identity: IdentityService
+
+
+def start_application(data_root: Path) -> ApplicationRuntime:
+    store = initialize_data_root(data_root)
+    startup_health = StartupHealthService(store).inspect()
+    if startup_health.state != StartupState.HEALTHY:
+        raise ApplicationRuntimeError(
+            f"cannot start application while storage is {startup_health.state.value}: {startup_health.message}"
+        )
+
+    inventory = InventoryService(store)
+    accounting = AccountingService(store)
+    return ApplicationRuntime(
+        store=store,
+        startup_health=startup_health,
+        inventory=inventory,
+        accounting=accounting,
+        billing=BillingService(store, inventory, accounting),
+        reporting=ReportingService(store),
+        backup=BackupService(store),
+        identity=IdentityService(store),
+    )

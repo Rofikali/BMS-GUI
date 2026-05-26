@@ -16,7 +16,8 @@ Start here. This folder has vision documents, architecture blueprints, and imple
 8. `INVARIANTS.md` - release-blocking correctness gates
 9. `IMPLEMENTATION_ROADMAP.md` - first build order
 10. `FIRST_TEST_PLAN.md` - first verification plan
-11. `BUSINESS_STRATEGY.md` - target customer and business model
+11. `RELEASE_GATE.md` - MVP-safe release checklist
+12. `BUSINESS_STRATEGY.md` - target customer and business model
 
 ---
 
@@ -39,6 +40,7 @@ Start here. This folder has vision documents, architecture blueprints, and imple
 | `FILE_STORAGE_SPEC.md` | MVP file storage contract |
 | `IMPLEMENTATION_ROADMAP.md` | build sequence |
 | `FIRST_TEST_PLAN.md` | first test sequence |
+| `RELEASE_GATE.md` | MVP-safe release checklist |
 
 ---
 

@@ -32,6 +32,7 @@ Useful entry points:
 - [docs/MVP_SCOPE.md](docs/MVP_SCOPE.md) - first production-grade release boundary
 - [docs/IMPLEMENTATION_ROADMAP.md](docs/IMPLEMENTATION_ROADMAP.md) - first build order
 - [docs/FIRST_TEST_PLAN.md](docs/FIRST_TEST_PLAN.md) - first verification plan
+- [docs/RELEASE_GATE.md](docs/RELEASE_GATE.md) - MVP-safe release checklist
 - [docs/BUSINESS_STRATEGY.md](docs/BUSINESS_STRATEGY.md) - target customer and business model
 
 ## Build And Test
@@ -55,10 +56,25 @@ Run checksum-focused tests:
 ctest --test-dir build -R checksum --output-on-failure
 ```
 
-```all passed what should be next steps as a principle/stuff enginner
-Use pydantic if better as a stuff/principle enginner here
+Run Python tests through the project environment:
+
+```bash
+uv run python -m unittest discover tests
+```
+
+Run the desktop app:
+
+```bash
+uv run bms-gui
+```
+
+Run the full local verification gate:
+
+```bash
 cmake -S . -B build -G Ninja
 cmake --build build
 ctest --test-dir build --output-on-failure
-PYTHONPATH=src python3 -m unittest discover tests/unit
+uv run python -m unittest discover tests
 ```
+
+CI runs the same verification gate in `.github/workflows/ci.yml`.

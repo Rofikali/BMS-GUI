@@ -11,6 +11,7 @@ from typing import Any
 BMS_OK = 0
 BMS_ERR_DUPLICATE_IDEMPOTENCY_KEY = 5
 BMS_ERR_RECOVERY_REQUIRED = 7
+BMS_ERR_PROTECTED_MODE = 8
 
 BMS_WAL_RECOVERY_CLEAN = 0
 BMS_WAL_RECOVERY_PENDING_ROLLBACK = 1
@@ -135,7 +136,7 @@ class BmsCore:
         decision = ctypes.c_int(BMS_WAL_RECOVERY_CLEAN)
         snapshot = str(required_snapshot_path).encode() if required_snapshot_path else None
         status = self._lib.bms_wal_inspect_startup(str(wal_path).encode(), snapshot, ctypes.byref(decision))
-        if status not in (BMS_OK, BMS_ERR_RECOVERY_REQUIRED):
+        if status not in (BMS_OK, BMS_ERR_RECOVERY_REQUIRED, BMS_ERR_PROTECTED_MODE):
             raise BmsCoreError("bms_wal_inspect_startup", status)
         return WalRecoveryResult(status=int(status), decision=int(decision.value))
 
@@ -143,7 +144,7 @@ class BmsCore:
         decision = ctypes.c_int(BMS_WAL_RECOVERY_CLEAN)
         snapshot = str(required_snapshot_path).encode() if required_snapshot_path else None
         status = self._lib.bms_wal_recover_startup(str(wal_path).encode(), snapshot, ctypes.byref(decision))
-        if status not in (BMS_OK, BMS_ERR_RECOVERY_REQUIRED):
+        if status not in (BMS_OK, BMS_ERR_RECOVERY_REQUIRED, BMS_ERR_PROTECTED_MODE):
             raise BmsCoreError("bms_wal_recover_startup", status)
         return WalRecoveryResult(status=int(status), decision=int(decision.value))
 
