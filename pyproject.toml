@@ -17,6 +17,7 @@ dev = [
 [project.scripts]
 bms-gui = "bms.ui.main:main"
 bms-core-smoke = "bms.app.bootstrap:main"
+bms-recovery = "bms.app.recovery_cli:main"
 
 [build-system]
 requires = ["hatchling>=1.25"]

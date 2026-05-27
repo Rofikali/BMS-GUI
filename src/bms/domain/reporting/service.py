@@ -11,6 +11,8 @@ from bms.domain.reporting.models import (
     InvoiceReportRow,
     LedgerReport,
     LedgerReportRow,
+    RefundReport,
+    RefundReportRow,
     StockReport,
     StockReportRow,
     TaxReport,
@@ -19,6 +21,7 @@ from bms.domain.reporting.models import (
 from bms.domain.reporting.schemas import (
     InvoiceReportSchema,
     LedgerReportSchema,
+    RefundReportSchema,
     StockReportSchema,
     TaxReportSchema,
     TrialBalanceReportSchema,
@@ -69,6 +72,53 @@ class ReportingService:
         return InvoiceReport(
             period_id=period_id,
             rows=tuple(sorted(rows, key=lambda row: (row.timestamp, row.invoice_id))),
+            totals=tuple(
+                CurrencyTotals(
+                    currency=currency,
+                    subtotal_minor=totals["subtotal"],
+                    tax_minor=totals["tax"],
+                    total_minor=totals["total"],
+                )
+                for currency, totals in sorted(totals_by_currency.items())
+            ),
+        )
+
+    def get_refund_report(self, period_id: str | None = None) -> RefundReport:
+        rows = []
+        totals_by_currency: dict[str, dict[str, int]] = {}
+        for payload in self.store.read_payloads(self.store.refunds):
+            refund_period_id = _str_payload(payload, "period_id")
+            if period_id is not None and refund_period_id != period_id:
+                continue
+
+            currency = _str_payload(payload, "currency")
+            subtotal_minor = _int_payload(payload, "subtotal_minor")
+            tax_minor = _int_payload(payload, "tax_minor")
+            total_minor = _int_payload(payload, "total_minor")
+            rows.append(
+                RefundReportRow(
+                    refund_id=_str_payload(payload, "refund_id"),
+                    original_invoice_id=_str_payload(payload, "original_invoice_id"),
+                    period_id=refund_period_id,
+                    timestamp=_str_payload(payload, "timestamp"),
+                    status=_str_payload(payload, "status"),
+                    reason=_str_payload(payload, "reason"),
+                    currency=currency,
+                    subtotal_minor=subtotal_minor,
+                    tax_minor=tax_minor,
+                    total_minor=total_minor,
+                    journal_id=_str_payload(payload, "journal_id"),
+                    movement_ids=_string_tuple_payload(payload, "movement_ids"),
+                )
+            )
+            totals = totals_by_currency.setdefault(currency, {"subtotal": 0, "tax": 0, "total": 0})
+            totals["subtotal"] += subtotal_minor
+            totals["tax"] += tax_minor
+            totals["total"] += total_minor
+
+        return RefundReport(
+            period_id=period_id,
+            rows=tuple(sorted(rows, key=lambda row: (row.timestamp, row.refund_id))),
             totals=tuple(
                 CurrencyTotals(
                     currency=currency,
@@ -147,6 +197,9 @@ class ReportingService:
     def export_invoice_report(self, period_id: str | None = None) -> dict[str, Any]:
         return dump_report_schema(InvoiceReportSchema.from_report(self.get_invoice_report(period_id)))
 
+    def export_refund_report(self, period_id: str | None = None) -> dict[str, Any]:
+        return dump_report_schema(RefundReportSchema.from_report(self.get_refund_report(period_id)))
+
     def export_stock_report(self, *, low_stock_threshold: int = 0) -> dict[str, Any]:
         return dump_report_schema(StockReportSchema.from_report(self.get_stock_report(low_stock_threshold=low_stock_threshold)))
 
@@ -172,3 +225,10 @@ def _int_payload(payload: dict[str, object], key: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ReportingError(f"stored report payload field {key} is not an integer")
     return value
+
+
+def _string_tuple_payload(payload: dict[str, object], key: str) -> tuple[str, ...]:
+    value = payload.get(key)
+    if not isinstance(value, list) or not all(isinstance(item, str) and item for item in value):
+        raise ReportingError(f"stored report payload field {key} is not a string list")
+    return tuple(value)

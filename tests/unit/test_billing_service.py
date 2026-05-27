@@ -4,10 +4,18 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from bms.app import ApplicationRecoveryError, recover_application_storage
 from bms.app.bootstrap import initialize_data_root
 from bms.domain.accounting import AccountingService
-from bms.domain.billing import BillingError, BillingService, CreateInvoiceCommand, InvoiceLineCommand
-from bms.domain.inventory import InventoryService, Item
+from bms.domain.billing import (
+    BillingError,
+    BillingService,
+    CreateInvoiceCommand,
+    CreateRefundCommand,
+    InvoiceLineCommand,
+    RefundLineCommand,
+)
+from bms.domain.inventory import InventoryService, Item, StockMovementCommand
 
 
 class BillingServiceTests(unittest.TestCase):
@@ -87,6 +95,24 @@ class BillingServiceTests(unittest.TestCase):
             self.assertEqual(store.core.verify_file(store.invoices), 0)
             self.assertEqual(store.core.verify_file(store.journal_entries), 0)
             self.assertEqual(inventory.get_stock_on_hand("ITEM-1"), 3)
+
+    def test_inventory_failure_after_journal_blocks_automatic_recovery(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            store = initialize_data_root(root)
+            setup_inventory = InventoryService(store)
+            _register_and_stock_item(setup_inventory, quantity=3)
+            accounting = AccountingService(store)
+            billing = BillingService(store, _FailingInventoryService(store), accounting)
+
+            with self.assertRaisesRegex(RuntimeError, "inventory unavailable"):
+                billing.create_invoice(_invoice("INV-FAIL-STOCK", quantity=1, unit_price_minor=50000))
+
+            self.assertEqual(store.core.verify_file(store.invoices), 0)
+            self.assertEqual(store.core.verify_file(store.journal_entries), 1)
+            self.assertTrue(accounting.get_trial_balance("FY2026-05").is_balanced)
+            with self.assertRaisesRegex(ApplicationRecoveryError, "durable side effects"):
+                recover_application_storage(root)
 
     def test_invoice_survives_service_restart(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -177,6 +203,85 @@ class BillingServiceTests(unittest.TestCase):
             self.assertIn("billing.invoice_created", [payload["action"] for payload in audit_payloads])
             self.assertIn("billing.sale_completed.v1", [payload["event_type"] for payload in event_payloads])
 
+    def test_create_refund_posts_reversal_journal_restock_and_audit_event(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store, billing, inventory, accounting = _services(Path(temp_dir))
+            _register_and_stock_item(inventory, quantity=5)
+            billing.create_invoice(_invoice("INV-REFUND-1", quantity=2, unit_price_minor=50000))
+
+            refund = billing.create_refund(_refund("REF-1", original_invoice_id="INV-REFUND-1", restock=True))
+
+            self.assertEqual(refund.subtotal_minor, 100000)
+            self.assertEqual(refund.tax_minor, 18000)
+            self.assertEqual(refund.total_minor, 118000)
+            self.assertEqual(inventory.get_stock_on_hand("ITEM-1"), 5)
+            self.assertTrue(accounting.get_trial_balance("FY2026-05").is_balanced)
+            balances = accounting.get_ledger_balances("FY2026-05")
+            self.assertEqual(balances["1000"].balance_minor, 0)
+            self.assertEqual(balances["4000"].balance_minor, 0)
+            self.assertEqual(balances["2100"].balance_minor, 0)
+            self.assertEqual(store.core.verify_file(store.refunds), 1)
+            self.assertEqual(store.core.verify_file(store.refund_lines), 1)
+            self.assertEqual(store.core.verify_file(store.stock_movements), 3)
+            audit_actions = [payload["action"] for payload in store.read_payloads(store.audit_records)]
+            event_types = [payload["event_type"] for payload in store.read_payloads(store.business_events)]
+            self.assertIn("billing.refund_created", audit_actions)
+            self.assertIn("billing.refund_completed.v1", event_types)
+
+    def test_refund_without_restock_does_not_move_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store, billing, inventory, _accounting = _services(Path(temp_dir))
+            _register_and_stock_item(inventory, quantity=5)
+            billing.create_invoice(_invoice("INV-REFUND-NORESTOCK", quantity=2, unit_price_minor=50000))
+
+            refund = billing.create_refund(_refund("REF-NORESTOCK", original_invoice_id="INV-REFUND-NORESTOCK", restock=False))
+
+            self.assertEqual(refund.movement_ids, ())
+            self.assertEqual(inventory.get_stock_on_hand("ITEM-1"), 3)
+            self.assertEqual(store.core.verify_file(store.stock_movements), 2)
+
+    def test_refund_unknown_invoice_is_rejected_before_side_effects(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store, billing, _inventory, _accounting = _services(Path(temp_dir))
+
+            with self.assertRaisesRegex(BillingError, "original invoice"):
+                billing.create_refund(_refund("REF-UNKNOWN", original_invoice_id="INV-MISSING"))
+
+            self.assertEqual(store.core.verify_file(store.refunds), 0)
+            self.assertEqual(store.core.verify_file(store.journal_entries), 0)
+
+    def test_duplicate_refund_does_not_double_post(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store, billing, inventory, _accounting = _services(Path(temp_dir))
+            _register_and_stock_item(inventory, quantity=5)
+            billing.create_invoice(_invoice("INV-REFUND-DUP", quantity=2, unit_price_minor=50000))
+            billing.create_refund(_refund("REF-DUP", original_invoice_id="INV-REFUND-DUP"))
+
+            with self.assertRaisesRegex(BillingError, "already completed"):
+                billing.create_refund(_refund("REF-DUP", original_invoice_id="INV-REFUND-DUP"))
+
+            self.assertEqual(store.core.verify_file(store.refunds), 1)
+            self.assertEqual(store.core.verify_file(store.journal_entries), 2)
+            self.assertEqual(inventory.get_stock_on_hand("ITEM-1"), 5)
+
+    def test_closed_period_blocks_refund_before_side_effects(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store, billing, inventory, accounting = _services(Path(temp_dir))
+            _register_and_stock_item(inventory, quantity=5)
+            billing.create_invoice(_invoice("INV-REFUND-CLOSED", quantity=2, unit_price_minor=50000))
+            accounting.close_period(
+                "FY2026-05",
+                actor_id="usr_accountant",
+                closed_at="2026-05-14T04:00:00Z",
+                correlation_id="corr_close_FY2026_05",
+            )
+
+            with self.assertRaisesRegex(BillingError, "closed"):
+                billing.create_refund(_refund("REF-CLOSED", original_invoice_id="INV-REFUND-CLOSED"))
+
+            self.assertEqual(store.core.verify_file(store.refunds), 0)
+            self.assertEqual(store.core.verify_file(store.journal_entries), 1)
+
 
 class _FailingAccountingService:
     def __init__(self, store: object) -> None:
@@ -187,6 +292,11 @@ class _FailingAccountingService:
 
     def post_journal(self, command: object) -> object:
         raise RuntimeError("accounting unavailable")
+
+
+class _FailingInventoryService(InventoryService):
+    def commit_movement(self, command: StockMovementCommand) -> object:
+        raise RuntimeError("inventory unavailable")
 
 
 def _services(root: Path) -> tuple[object, BillingService, InventoryService, AccountingService]:
@@ -227,6 +337,20 @@ def _invoice(invoice_id: str, *, quantity: int, unit_price_minor: int) -> Create
         payment_method="cash",
         currency="INR",
         lines=(InvoiceLineCommand("ITEM-1", quantity, unit_price_minor, "Test Item"),),
+    )
+
+
+def _refund(refund_id: str, *, original_invoice_id: str, restock: bool = True) -> CreateRefundCommand:
+    return CreateRefundCommand(
+        refund_id=refund_id,
+        original_invoice_id=original_invoice_id,
+        period_id="FY2026-05",
+        timestamp="2026-05-14T03:00:00Z",
+        actor_id="usr_cashier",
+        correlation_id=f"corr_{refund_id}",
+        currency="INR",
+        reason="customer return",
+        lines=(RefundLineCommand("ITEM-1", 2, 50000, "Test Item", restock=restock),),
     )
 
 

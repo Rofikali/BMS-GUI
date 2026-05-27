@@ -25,7 +25,10 @@ class CoreFileStore:
         self.stock_movements = self.data_root / "inventory" / "stock_movements.jsonl"
         self.invoices = self.data_root / "billing" / "invoices.jsonl"
         self.invoice_lines = self.data_root / "billing" / "invoice_lines.jsonl"
+        self.refunds = self.data_root / "billing" / "refunds" / "refunds.jsonl"
+        self.refund_lines = self.data_root / "billing" / "refunds" / "refund_lines.jsonl"
         self.audit_records = self.data_root / "audit" / "audit_records.jsonl"
+        self.reconciliation_records = self.data_root / "recovery" / "reconciliation_records.jsonl"
         self.users = self.data_root / "users" / "users.json"
         self.roles = self.data_root / "users" / "roles.json"
 

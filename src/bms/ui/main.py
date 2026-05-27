@@ -30,6 +30,7 @@ def _import_qt() -> SimpleNamespace:
             QMainWindow,
             QMessageBox,
             QPushButton,
+            QCheckBox,
             QComboBox,
             QSpinBox,
             QStatusBar,
@@ -169,8 +170,50 @@ def build_main_window_class():
             totals.addRow("Tax", self.invoice_tax_label)
             totals.addRow("Total", self.invoice_total_label)
 
+            refund_group = qt.QGroupBox("Refund")
+            refund_form = qt.QFormLayout(refund_group)
+            self.refund_id_input = qt.QLineEdit("REF-1001")
+            self.refund_invoice_id_input = qt.QLineEdit("INV-1001")
+            self.refund_item_id_input = qt.QLineEdit("ITEM-1")
+            self.refund_quantity_input = _spin_box(qt, 1, 1_000_000, 1)
+            self.refund_unit_price_input = _spin_box(qt, 0, 1_000_000_000, 50000)
+            self.refund_restock_input = qt.QCheckBox()
+            self.refund_restock_input.setChecked(True)
+            refund_form.addRow("Refund ID", self.refund_id_input)
+            refund_form.addRow("Original invoice", self.refund_invoice_id_input)
+            refund_form.addRow("Item ID", self.refund_item_id_input)
+            refund_form.addRow("Quantity", self.refund_quantity_input)
+            refund_form.addRow("Unit price minor", self.refund_unit_price_input)
+            refund_form.addRow("Restock", self.refund_restock_input)
+
+            refund_actions = qt.QHBoxLayout()
+            self.create_refund_button = qt.QPushButton("Refund")
+            self.create_refund_button.setIcon(
+                self.style().standardIcon(qt.QStyle.StandardPixmap.SP_DialogResetButton)
+            )
+            self.create_refund_button.clicked.connect(self.create_refund)
+            refund_actions.addWidget(self.create_refund_button)
+            refund_actions.addStretch(1)
+            refund_form.addRow(refund_actions)
+
+            refund_totals_group = qt.QGroupBox("Refund Result")
+            refund_totals = qt.QFormLayout(refund_totals_group)
+            self.refund_result_label = qt.QLabel("No refund posted")
+            self.refund_result_label.setTextInteractionFlags(
+                qt.Qt.TextInteractionFlag.TextSelectableByMouse
+            )
+            self.refund_subtotal_label = qt.QLabel("0")
+            self.refund_tax_label = qt.QLabel("0")
+            self.refund_total_label = qt.QLabel("0")
+            refund_totals.addRow("Refund", self.refund_result_label)
+            refund_totals.addRow("Subtotal", self.refund_subtotal_label)
+            refund_totals.addRow("Tax", self.refund_tax_label)
+            refund_totals.addRow("Total", self.refund_total_label)
+
             layout.addWidget(form_group, 0, 0)
             layout.addWidget(totals_group, 0, 1)
+            layout.addWidget(refund_group, 1, 0)
+            layout.addWidget(refund_totals_group, 1, 1)
             return page
 
         def _build_reports_tab(self):
@@ -182,14 +225,19 @@ def build_main_window_class():
             summary_group = qt.QGroupBox("Summary")
             summary = qt.QFormLayout(summary_group)
             self.report_invoice_total_label = qt.QLabel("0")
+            self.report_refund_total_label = qt.QLabel("0")
             self.report_tax_payable_label = qt.QLabel("0")
             self.report_trial_balance_label = qt.QLabel("Unknown")
             summary.addRow("Invoice total", self.report_invoice_total_label)
+            summary.addRow("Refund total", self.report_refund_total_label)
             summary.addRow("Tax payable", self.report_tax_payable_label)
             summary.addRow("Trial balance", self.report_trial_balance_label)
 
             self.invoice_table = _table(
                 qt, ["Invoice", "Customer", "Subtotal", "Tax", "Total"]
+            )
+            self.refund_table = _table(
+                qt, ["Refund", "Invoice", "Reason", "Subtotal", "Tax", "Total"]
             )
             self.ledger_table = _table(
                 qt, ["Account", "Name", "Debit", "Credit", "Balance"]
@@ -197,7 +245,8 @@ def build_main_window_class():
 
             layout.addWidget(summary_group, 0, 0, 1, 2)
             layout.addWidget(self.invoice_table, 1, 0)
-            layout.addWidget(self.ledger_table, 1, 1)
+            layout.addWidget(self.refund_table, 1, 1)
+            layout.addWidget(self.ledger_table, 2, 0, 1, 2)
             return page
 
         def _build_backup_tab(self):
@@ -307,6 +356,39 @@ def build_main_window_class():
             except Exception as exc:
                 self._show_error(exc)
 
+        def create_refund(self) -> None:
+            try:
+                refund_id = self.refund_id_input.text().strip()
+                result = self.facade.create_refund(
+                    {
+                        "refund_id": refund_id,
+                        "original_invoice_id": self.refund_invoice_id_input.text().strip(),
+                        "period_id": "FY2026-05",
+                        "timestamp": _timestamp(),
+                        "actor_id": self._current_actor_id(),
+                        "correlation_id": f"corr_{refund_id}",
+                        "currency": "INR",
+                        "reason": "customer return",
+                        "lines": [
+                            {
+                                "item_id": self.refund_item_id_input.text().strip(),
+                                "quantity": self.refund_quantity_input.value(),
+                                "unit_price_minor": self.refund_unit_price_input.value(),
+                                "description": self.item_name_input.text().strip(),
+                                "restock": self.refund_restock_input.isChecked(),
+                            }
+                        ],
+                    }
+                )
+                self.refund_result_label.setText(str(result["refund_id"]))
+                self.refund_subtotal_label.setText(str(result["subtotal_minor"]))
+                self.refund_tax_label.setText(str(result["tax_minor"]))
+                self.refund_total_label.setText(str(result["total_minor"]))
+                self._set_status(f"Created refund {refund_id}")
+                self.refresh_reports()
+            except Exception as exc:
+                self._show_error(exc)
+
         def create_backup(self) -> None:
             try:
                 result = self.facade.create_backup(
@@ -366,6 +448,7 @@ def build_main_window_class():
 
         def refresh_reports(self) -> None:
             invoice_report = self.facade.invoice_report("FY2026-05")
+            refund_report = self.facade.refund_report("FY2026-05")
             stock_report = self.facade.stock_report(low_stock_threshold=3)
             ledger_report = self.facade.ledger_report("FY2026-05")
             tax_report = self.facade.tax_report("FY2026-05")
@@ -374,7 +457,11 @@ def build_main_window_class():
             invoice_total = sum(
                 total["total_minor"] for total in invoice_report["totals"]
             )
+            refund_total = sum(
+                total["total_minor"] for total in refund_report["totals"]
+            )
             self.report_invoice_total_label.setText(str(invoice_total))
+            self.report_refund_total_label.setText(str(refund_total))
             self.report_tax_payable_label.setText(
                 str(tax_report["tax_payable_balance_minor"])
             )
@@ -408,6 +495,21 @@ def build_main_window_class():
                         str(row["total_minor"]),
                     ]
                     for row in invoice_report["rows"]
+                ],
+            )
+            _set_rows(
+                qt,
+                self.refund_table,
+                [
+                    [
+                        row["refund_id"],
+                        row["original_invoice_id"],
+                        row["reason"],
+                        str(row["subtotal_minor"]),
+                        str(row["tax_minor"]),
+                        str(row["total_minor"]),
+                    ]
+                    for row in refund_report["rows"]
                 ],
             )
             _set_rows(

@@ -5,6 +5,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from bms.core import (
+    BmsCoreError,
     BMS_ERR_PROTECTED_MODE,
     BMS_ERR_RECOVERY_REQUIRED,
     BMS_OK,
@@ -37,6 +38,9 @@ class StartupHealthService:
     def inspect(self, required_snapshot_path: Path | None = None) -> StartupHealth:
         result = self.store.inspect_wal_startup(required_snapshot_path)
         if result.status == BMS_OK and result.decision == BMS_WAL_RECOVERY_CLEAN:
+            source_health = self._inspect_source_files()
+            if source_health is not None:
+                return source_health
             return StartupHealth(
                 state=StartupState.HEALTHY,
                 wal_status=result.status,
@@ -64,8 +68,37 @@ class StartupHealthService:
             message="storage startup returned an unknown WAL state",
         )
 
+    def _inspect_source_files(self) -> StartupHealth | None:
+        for attribute_name in _SOURCE_FILE_ATTRIBUTES:
+            path = getattr(self.store, attribute_name)
+            try:
+                self.store.core.verify_file(path)
+            except BmsCoreError:
+                return StartupHealth(
+                    state=StartupState.PROTECTED_MODE,
+                    wal_status=BMS_ERR_PROTECTED_MODE,
+                    wal_decision=BMS_WAL_RECOVERY_PROTECTED_READ_ONLY,
+                    message=f"source file failed integrity verification: {path.name}",
+                )
+        return None
+
 
 _RECOVERY_REQUIRED_DECISIONS = {
     BMS_WAL_RECOVERY_PENDING_ROLLBACK,
     BMS_WAL_RECOVERY_COMMITTED_MISSING_SNAPSHOT,
 }
+
+_SOURCE_FILE_ATTRIBUTES = (
+    "business_events",
+    "journal_entries",
+    "journal_lines",
+    "periods",
+    "items",
+    "stock_movements",
+    "invoices",
+    "invoice_lines",
+    "refunds",
+    "refund_lines",
+    "audit_records",
+    "reconciliation_records",
+)

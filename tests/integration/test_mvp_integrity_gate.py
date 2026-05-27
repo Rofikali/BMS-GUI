@@ -7,8 +7,8 @@ from pathlib import Path
 from bms.app import StartupHealthService, StartupState, start_command_facade
 from bms.app.bootstrap import initialize_data_root
 from bms.core import BMS_OK, BMS_WAL_RECOVERY_CLEAN
-from bms.domain.accounting import AccountingService
-from bms.domain.billing import BillingService, CreateInvoiceCommand, InvoiceLineCommand
+from bms.domain.accounting import AccountingError, AccountingService, JournalLine, PostJournalCommand
+from bms.domain.billing import BillingError, BillingService, CreateInvoiceCommand, InvoiceLineCommand
 from bms.domain.inventory import InventoryService, Item
 from bms.domain.reporting import ReportingService
 from bms.services import BackupService
@@ -137,6 +137,65 @@ class MvpIntegrityGateTests(unittest.TestCase):
             self.assertEqual(restored.invoice_report("FY2026-05")["totals"][0]["total_minor"], 118000)
             self.assertEqual(restored.stock_report()["rows"][0]["quantity_on_hand"], 3)
 
+    def test_period_close_blocks_mutations_and_survives_backup_restore(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "live"
+            restore_root = Path(temp_dir) / "restored"
+            store, billing, inventory, accounting = _services(root)
+
+            inventory.register_item(
+                Item("ITEM-1", "SKU-1", "Test Item"),
+                actor_id="usr_inventory",
+                created_at="2026-05-14T00:00:00Z",
+                correlation_id="corr_item_ITEM-1",
+            )
+            inventory.adjust_stock(
+                movement_id="MOV-PERIOD-CLOSE-IN",
+                item_id="ITEM-1",
+                quantity_delta=5,
+                timestamp="2026-05-14T00:05:00Z",
+                actor_id="usr_inventory",
+                reason="opening stock",
+                source_document_id="STK-1001",
+                correlation_id="corr_period_close_stock_in",
+            )
+            billing.create_invoice(_invoice())
+
+            accounting.close_period(
+                "FY2026-05",
+                actor_id="usr_accountant",
+                closed_at="2026-05-14T04:00:00Z",
+                correlation_id="corr_close_FY2026_05",
+            )
+
+            reports = ReportingService(store)
+            self.assertEqual(reports.get_invoice_report("FY2026-05").totals[0].total_minor, 118000)
+            self.assertTrue(reports.get_trial_balance_report("FY2026-05").is_balanced)
+            self.assertEqual(inventory.get_stock_on_hand("ITEM-1"), 3)
+            with self.assertRaisesRegex(BillingError, "closed"):
+                billing.create_invoice(_invoice_with_id("INV-CLOSED-PERIOD"))
+            with self.assertRaisesRegex(AccountingError, "closed"):
+                accounting.post_journal(_manual_journal("JRN-CLOSED-PERIOD"))
+
+            restarted_store, _restarted_billing, _restarted_inventory, restarted_accounting = _services(root)
+            with self.assertRaisesRegex(AccountingError, "closed"):
+                restarted_accounting.post_journal(_manual_journal("JRN-CLOSED-AFTER-RESTART"))
+
+            backup = BackupService(restarted_store).create_backup(created_at="2026-05-14T05:00:00Z")
+            restore = BackupService.restore_backup(backup.backup_path, restore_root)
+            restored_store, restored_billing, restored_inventory, restored_accounting = _services(restore_root)
+            restored_reports = ReportingService(restored_store)
+
+            self.assertEqual(restore.verified_record_counts, backup.verified_record_counts)
+            self.assertEqual(restored_store.core.verify_file(restored_store.periods), 1)
+            self.assertEqual(restored_reports.get_invoice_report("FY2026-05").totals[0].total_minor, 118000)
+            self.assertEqual(restored_inventory.get_stock_on_hand("ITEM-1"), 3)
+            self.assertTrue(restored_reports.get_trial_balance_report("FY2026-05").is_balanced)
+            with self.assertRaisesRegex(BillingError, "closed"):
+                restored_billing.create_invoice(_invoice_with_id("INV-CLOSED-RESTORED"))
+            with self.assertRaisesRegex(AccountingError, "closed"):
+                restored_accounting.post_journal(_manual_journal("JRN-CLOSED-RESTORED"))
+
 
 def _services(root: Path) -> tuple[object, BillingService, InventoryService, AccountingService]:
     store = initialize_data_root(root)
@@ -147,16 +206,37 @@ def _services(root: Path) -> tuple[object, BillingService, InventoryService, Acc
 
 
 def _invoice() -> CreateInvoiceCommand:
+    return _invoice_with_id("INV-1001")
+
+
+def _invoice_with_id(invoice_id: str) -> CreateInvoiceCommand:
     return CreateInvoiceCommand(
-        invoice_id="INV-1001",
+        invoice_id=invoice_id,
         customer_id="CUS-1",
         period_id="FY2026-05",
         timestamp="2026-05-14T02:00:00Z",
         actor_id="usr_cashier",
-        correlation_id="corr_INV-1001",
+        correlation_id=f"corr_{invoice_id}",
         payment_method="cash",
         currency="INR",
         lines=(InvoiceLineCommand("ITEM-1", 2, 50000, "Test Item"),),
+    )
+
+
+def _manual_journal(journal_id: str) -> PostJournalCommand:
+    return PostJournalCommand(
+        journal_id=journal_id,
+        period_id="FY2026-05",
+        timestamp="2026-05-14T04:30:00Z",
+        actor_id="usr_accountant",
+        source_module="manual",
+        source_document_id=journal_id,
+        correlation_id=f"corr_{journal_id}",
+        description="Manual closed-period mutation attempt",
+        lines=(
+            JournalLine("1000", debit_minor=1000),
+            JournalLine("4000", credit_minor=1000),
+        ),
     )
 
 

@@ -19,8 +19,10 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
             item = facade.register_item(_register_item_payload())
             stock_in = facade.commit_stock_movement(_stock_movement_payload("MOV-FACADE-IN", 5, "adjustment"))
             invoice = facade.create_invoice(_invoice_payload())
+            refund = facade.create_refund(_refund_payload())
 
             invoice_report = facade.invoice_report("FY2026-05")
+            refund_report = facade.refund_report("FY2026-05")
             stock_report = facade.stock_report(low_stock_threshold=3)
             ledger_report = facade.ledger_report("FY2026-05")
             tax_report = facade.tax_report("FY2026-05")
@@ -38,13 +40,20 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
             self.assertEqual(stock_in["quantity_on_hand"], 5)
             self.assertEqual(invoice["invoice_id"], "INV-FACADE-1")
             self.assertEqual(invoice["total_minor"], 118000)
+            self.assertEqual(refund["refund_id"], "REF-FACADE-1")
+            self.assertEqual(refund["original_invoice_id"], "INV-FACADE-1")
+            self.assertEqual(refund["total_minor"], 59000)
+            self.assertEqual(len(refund["movement_ids"]), 1)
             self.assertEqual(invoice_report["totals"][0]["total_minor"], 118000)
-            self.assertEqual(stock_report["rows"][0]["quantity_on_hand"], 3)
+            self.assertEqual(refund_report["rows"][0]["refund_id"], "REF-FACADE-1")
+            self.assertEqual(refund_report["totals"][0]["total_minor"], 59000)
+            self.assertEqual(stock_report["rows"][0]["quantity_on_hand"], 4)
             self.assertEqual({row["account_code"] for row in ledger_report["rows"]}, {"1000", "2100", "4000"})
             self.assertEqual(tax_report["invoice_tax_collected_minor"], 18000)
             self.assertTrue(trial_balance["is_balanced"])
             self.assertTrue(Path(backup["backup_path"]).exists())
             self.assertEqual(backup["verified_record_counts"]["invoices"], 1)
+            self.assertEqual(backup["verified_record_counts"]["refunds"], 1)
             self.assertEqual(restore["verified_record_counts"], backup["verified_record_counts"])
 
     def test_facade_maps_restore_non_empty_target_to_business_error(self) -> None:
@@ -115,6 +124,19 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
             self.assertEqual(context.exception.operation, "billing.create_invoice")
             self.assertEqual(context.exception.cause_type, "AuthorizationError")
 
+    def test_facade_rejects_unauthorized_refund_before_service_call(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            facade = start_command_facade(Path(temp_dir))
+            payload = _refund_payload()
+            payload["actor_id"] = "usr_accountant"
+
+            with self.assertRaises(ApplicationCommandError) as context:
+                facade.create_refund(payload)
+
+            self.assertEqual(context.exception.code, ApplicationErrorCode.UNAUTHORIZED)
+            self.assertEqual(context.exception.operation, "billing.create_refund")
+            self.assertEqual(context.exception.cause_type, "AuthorizationError")
+
     def test_facade_rejects_malformed_boundary_payload_before_service_call(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             facade = start_command_facade(Path(temp_dir))
@@ -133,6 +155,27 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
 
             self.assertEqual(context.exception.code, ApplicationErrorCode.VALIDATION)
             self.assertEqual(context.exception.operation, "billing.create_invoice")
+            self.assertEqual(context.exception.cause_type, "ValidationError")
+
+    def test_facade_rejects_malformed_refund_payload_before_service_call(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            facade = start_command_facade(Path(temp_dir))
+            payload = _refund_payload()
+            payload["lines"] = [
+                {
+                    "item_id": "ITEM-1",
+                    "quantity": "1",
+                    "unit_price_minor": 50000,
+                    "description": "Test Item",
+                    "restock": True,
+                }
+            ]
+
+            with self.assertRaises(ApplicationCommandError) as context:
+                facade.create_refund(payload)
+
+            self.assertEqual(context.exception.code, ApplicationErrorCode.VALIDATION)
+            self.assertEqual(context.exception.operation, "billing.create_refund")
             self.assertEqual(context.exception.cause_type, "ValidationError")
 
     def test_facade_still_leaves_accounting_invariants_to_service(self) -> None:
@@ -171,6 +214,17 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
 
             self.assertEqual(context.exception.code, ApplicationErrorCode.BUSINESS_RULE)
             self.assertEqual(context.exception.operation, "billing.create_invoice")
+            self.assertIsInstance(context.exception.__cause__, BillingError)
+
+    def test_facade_maps_unknown_invoice_refund_to_business_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            facade = start_command_facade(Path(temp_dir))
+
+            with self.assertRaises(ApplicationCommandError) as context:
+                facade.create_refund(_refund_payload())
+
+            self.assertEqual(context.exception.code, ApplicationErrorCode.BUSINESS_RULE)
+            self.assertEqual(context.exception.operation, "billing.create_refund")
             self.assertIsInstance(context.exception.__cause__, BillingError)
 
     def test_start_command_facade_maps_protected_storage_to_app_error(self) -> None:
@@ -236,6 +290,28 @@ def _invoice_payload() -> dict[str, object]:
                 "quantity": 2,
                 "unit_price_minor": 50000,
                 "description": "Test Item",
+            }
+        ],
+    }
+
+
+def _refund_payload() -> dict[str, object]:
+    return {
+        "refund_id": "REF-FACADE-1",
+        "original_invoice_id": "INV-FACADE-1",
+        "period_id": "FY2026-05",
+        "timestamp": "2026-05-14T02:30:00Z",
+        "actor_id": "usr_cashier",
+        "correlation_id": "corr_REF_FACADE_1",
+        "currency": "INR",
+        "reason": "customer return",
+        "lines": [
+            {
+                "item_id": "ITEM-1",
+                "quantity": 1,
+                "unit_price_minor": 50000,
+                "description": "Test Item",
+                "restock": True,
             }
         ],
     }

@@ -1,0 +1,43 @@
+#!/usr/bin/env sh
+set -eu
+
+ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+BUILD_DIR=${BMS_BUILD_DIR:-"$ROOT_DIR/build/verify"}
+UV_CACHE_DIR=${UV_CACHE_DIR:-"/tmp/bms-gui-uv-cache"}
+QT_QPA_PLATFORM=${QT_QPA_PLATFORM:-offscreen}
+
+export UV_CACHE_DIR
+export QT_QPA_PLATFORM
+
+if [ -n "${CMAKE_GENERATOR:-}" ]; then
+    GENERATOR=$CMAKE_GENERATOR
+elif command -v ninja >/dev/null 2>&1; then
+    GENERATOR=Ninja
+else
+    GENERATOR="Unix Makefiles"
+fi
+
+if ! command -v cmake >/dev/null 2>&1; then
+    echo "error: cmake is required to verify BMS-GUI" >&2
+    exit 127
+fi
+
+if ! command -v uv >/dev/null 2>&1; then
+    echo "error: uv is required to run the Python verification gate" >&2
+    exit 127
+fi
+
+echo "==> Configuring native core ($GENERATOR)"
+cmake -S "$ROOT_DIR" -B "$BUILD_DIR" -G "$GENERATOR"
+
+echo "==> Building native core"
+cmake --build "$BUILD_DIR"
+
+echo "==> Running native tests"
+ctest --test-dir "$BUILD_DIR" --output-on-failure
+
+echo "==> Running Python tests"
+cd "$ROOT_DIR"
+uv run python -m unittest discover tests
+
+echo "==> Verification passed"

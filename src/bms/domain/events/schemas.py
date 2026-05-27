@@ -70,6 +70,27 @@ class BillingSaleCompletedV1(_BusinessEventSchema):
     line_count: int = Field(ge=1)
 
 
+class BillingRefundCompletedV1(_BusinessEventSchema):
+    event_type: Literal["billing.refund_completed.v1"]
+    refund_id: str
+    original_invoice_id: str
+    currency: str
+    subtotal_minor: int = Field(ge=0)
+    tax_minor: int = Field(ge=0)
+    total_minor: int = Field(ge=0)
+    line_count: int = Field(ge=1)
+
+
+class RecoveryReconciliationRecordedV1(_BusinessEventSchema):
+    event_type: Literal["recovery.reconciliation_recorded.v1"]
+    reconciliation_id: str
+    transaction_id: str
+    operation: str
+    decision: str
+    resolved: bool
+    correction_journal_id: str | None = None
+
+
 _EVENT_SCHEMAS: dict[str, type[_BusinessEventSchema]] = {
     "audit.record_created.v1": AuditRecordCreatedV1,
     "inventory.item_registered.v1": InventoryItemRegisteredV1,
@@ -77,6 +98,8 @@ _EVENT_SCHEMAS: dict[str, type[_BusinessEventSchema]] = {
     "accounting.journal_posted.v1": AccountingJournalPostedV1,
     "accounting.period_closed.v1": AccountingPeriodClosedV1,
     "billing.sale_completed.v1": BillingSaleCompletedV1,
+    "billing.refund_completed.v1": BillingRefundCompletedV1,
+    "recovery.reconciliation_recorded.v1": RecoveryReconciliationRecordedV1,
 }
 
 

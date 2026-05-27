@@ -20,9 +20,11 @@ Register item
 -> Persist durable records
 -> Write audit and business events
 -> Rebuild reports after restart
+-> Close accounting period
+-> Block closed-period invoice and journal mutations
 -> Create backup
 -> Restore backup into a clean target
--> Verify restored reports
+-> Verify restored reports and closed-period guards
 ```
 
 The release gate is intentionally narrow. Passing it means the kernel is trustworthy enough for continued pilot work, not that the whole product vision is complete.
@@ -34,10 +36,7 @@ The release gate is intentionally narrow. Passing it means the kernel is trustwo
 The full local and CI gate is:
 
 ```bash
-cmake -S . -B build -G Ninja
-cmake --build build
-ctest --test-dir build --output-on-failure
-uv run python -m unittest discover tests
+./scripts/verify
 ```
 
 This gate must pass with no failing tests before a release candidate is tagged.

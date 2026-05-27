@@ -135,8 +135,10 @@ class AuthorizationPolicy:
         "inventory.commit_stock_movement": frozenset({ApplicationRole.ADMIN}),
         "accounting.post_journal": frozenset({ApplicationRole.ACCOUNTANT}),
         "billing.create_invoice": frozenset({ApplicationRole.CASHIER}),
+        "billing.create_refund": frozenset({ApplicationRole.CASHIER}),
         "backup.create": frozenset({ApplicationRole.ADMIN}),
         "backup.restore": frozenset({ApplicationRole.ADMIN}),
+        "recovery.reconcile": frozenset({ApplicationRole.ADMIN}),
     }
 
     def require(self, operation: str, roles: Iterable[ApplicationRole]) -> None:

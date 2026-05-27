@@ -50,6 +50,30 @@ class StartupHealthServiceTests(unittest.TestCase):
             self.assertEqual(health.state, StartupState.PROTECTED_MODE)
             self.assertEqual(health.wal_status, BMS_ERR_PROTECTED_MODE)
 
+    def test_corrupt_source_file_reports_protected_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = initialize_data_root(Path(temp_dir))
+            store.append_record(
+                store.invoices,
+                "billing.invoice",
+                "usr_cashier",
+                "corr_invoice_corrupt",
+                "invoice_INV-CORRUPT",
+                {"invoice_id": "INV-CORRUPT"},
+                record_id="inv_INV-CORRUPT",
+                created_at="2026-05-14T00:00:00Z",
+            )
+            store.invoices.write_text(
+                store.invoices.read_text(encoding="utf-8").replace("INV-CORRUPT", "INV-TAMPERED", 1),
+                encoding="utf-8",
+            )
+
+            health = StartupHealthService(store).inspect()
+
+            self.assertEqual(health.state, StartupState.PROTECTED_MODE)
+            self.assertEqual(health.wal_status, BMS_ERR_PROTECTED_MODE)
+            self.assertIn("source file failed integrity verification", health.message)
+
 
 if __name__ == "__main__":
     unittest.main()

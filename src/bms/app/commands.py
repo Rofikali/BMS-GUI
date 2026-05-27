@@ -9,7 +9,7 @@ from bms.app.auth import AuthorizationPolicy, validate_actor_payload
 from bms.app.errors import map_application_error
 from bms.app.runtime import ApplicationRuntime, start_application
 from bms.domain.accounting import validate_post_journal_command_payload
-from bms.domain.billing import validate_create_invoice_command_payload
+from bms.domain.billing import validate_create_invoice_command_payload, validate_create_refund_command_payload
 from bms.domain.inventory import ItemSchema, validate_stock_movement_command_payload
 
 
@@ -68,6 +68,17 @@ class StockMovementOutputSchema(_FacadeOutputSchema):
 
 class InvoiceOutputSchema(_FacadeOutputSchema):
     invoice_id: str
+    journal_id: str
+    movement_ids: tuple[str, ...]
+    subtotal_minor: int = Field(ge=0)
+    tax_minor: int = Field(ge=0)
+    total_minor: int = Field(ge=0)
+    currency: str
+
+
+class RefundOutputSchema(_FacadeOutputSchema):
+    refund_id: str
+    original_invoice_id: str
     journal_id: str
     movement_ids: tuple[str, ...]
     subtotal_minor: int = Field(ge=0)
@@ -166,11 +177,26 @@ class ApplicationCommandFacade:
         except Exception as exc:
             raise map_application_error("billing.create_invoice", exc) from exc
 
+    def create_refund(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            self._authorize("billing.create_refund", payload)
+            command = validate_create_refund_command_payload(payload)
+            result = self.runtime.billing.create_refund(command)
+            return RefundOutputSchema.model_validate(result).model_dump(mode="json")
+        except Exception as exc:
+            raise map_application_error("billing.create_refund", exc) from exc
+
     def invoice_report(self, period_id: str | None = None) -> dict[str, Any]:
         try:
             return self.runtime.reporting.export_invoice_report(period_id)
         except Exception as exc:
             raise map_application_error("reporting.invoice_report", exc) from exc
+
+    def refund_report(self, period_id: str | None = None) -> dict[str, Any]:
+        try:
+            return self.runtime.reporting.export_refund_report(period_id)
+        except Exception as exc:
+            raise map_application_error("reporting.refund_report", exc) from exc
 
     def stock_report(self, *, low_stock_threshold: int = 0) -> dict[str, Any]:
         try:
@@ -230,4 +256,3 @@ class ApplicationCommandFacade:
 
 def start_command_facade(data_root: Path) -> ApplicationCommandFacade:
     return ApplicationCommandFacade.start(data_root)
-

@@ -33,6 +33,29 @@ class InvoiceReport:
 
 
 @dataclass(frozen=True)
+class RefundReportRow:
+    refund_id: str
+    original_invoice_id: str
+    period_id: str
+    timestamp: str
+    status: str
+    reason: str
+    currency: str
+    subtotal_minor: int
+    tax_minor: int
+    total_minor: int
+    journal_id: str
+    movement_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RefundReport:
+    period_id: str | None
+    rows: tuple[RefundReportRow, ...]
+    totals: tuple[CurrencyTotals, ...]
+
+
+@dataclass(frozen=True)
 class StockReportRow:
     item_id: str
     sku: str

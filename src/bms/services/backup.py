@@ -120,7 +120,10 @@ _DURABLE_FILE_ATTRIBUTES = (
     "stock_movements",
     "invoices",
     "invoice_lines",
+    "refunds",
+    "refund_lines",
     "audit_records",
+    "reconciliation_records",
 )
 
 

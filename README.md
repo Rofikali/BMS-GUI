@@ -40,20 +40,21 @@ Useful entry points:
 Build the native core:
 
 ```bash
-cmake -S . -B build -G Ninja
-cmake --build build
+./scripts/verify
 ```
 
-Run core tests:
+The verification script configures the C build, runs native C tests, and runs the Python unit and integration tests. It uses Ninja when available and falls back to Unix Makefiles.
+
+Run only the native core tests after configuring a build:
 
 ```bash
-ctest --test-dir build --output-on-failure
+ctest --test-dir build/verify --output-on-failure
 ```
 
 Run checksum-focused tests:
 
 ```bash
-ctest --test-dir build -R checksum --output-on-failure
+ctest --test-dir build/verify -R checksum --output-on-failure
 ```
 
 Run Python tests through the project environment:
@@ -68,13 +69,20 @@ Run the desktop app:
 uv run bms-gui
 ```
 
+Inspect or recover storage when normal startup is blocked:
+
+```bash
+uv run bms-recovery inspect --data-root data
+uv run bms-recovery report --data-root data
+uv run bms-recovery recover --data-root data
+uv run bms-recovery reconcile --data-root data --transaction-id txn_... --decision accepted_existing_records --actor-id usr_admin --reason "Reviewed durable records"
+uv run bms-recovery resolve-accounting-adjustment --data-root data --transaction-id txn_... --actor-id usr_admin --reason "Posted correction journal" --journal-json '{"journal_id":"JRN-REC-1","period_id":"FY2026-05","timestamp":"2026-05-14T03:05:00Z","actor_id":"usr_admin","source_module":"recovery","source_document_id":"txn_...","correlation_id":"corr_txn","description":"Recovery accounting adjustment","lines":[{"account_code":"4000","debit_minor":100000,"currency":"INR"},{"account_code":"2100","debit_minor":18000,"currency":"INR"},{"account_code":"1000","credit_minor":118000,"currency":"INR"}]}'
+```
+
 Run the full local verification gate:
 
 ```bash
-cmake -S . -B build -G Ninja
-cmake --build build
-ctest --test-dir build --output-on-failure
-uv run python -m unittest discover tests
+./scripts/verify
 ```
 
 CI runs the same verification gate in `.github/workflows/ci.yml`.

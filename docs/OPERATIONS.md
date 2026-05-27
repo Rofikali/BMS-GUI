@@ -1,5 +1,7 @@
 # OPERATIONS.md
+
 # INDUSTRY-GRADE OPERATIONS & RELIABILITY ARCHITECTURE
+
 ## SRE + Principal Engineer + CA + MBA Operational Blueprint
 
 ---
@@ -11,6 +13,7 @@ The platform is designed as an:
 > Operationally Reliable, Recoverable, Observable, Offline-First Business Operating Platform.
 
 Operations engineering focuses on:
+
 - reliability
 - survivability
 - recoverability
@@ -19,6 +22,7 @@ Operations engineering focuses on:
 - scalability
 
 The system must survive:
+
 - crashes
 - power failures
 - storage corruption
@@ -27,6 +31,7 @@ The system must survive:
 - operational mistakes
 
 without:
+
 - losing accounting correctness,
 - corrupting business data,
 - compromising auditability.
@@ -41,9 +46,10 @@ without:
 
 Core Principle:
 
-> Systems must survive real-world operational failures. 
+> Systems must survive real-world operational failures.
 
 The platform must support:
+
 - graceful degradation
 - automated recovery
 - operational diagnostics
@@ -57,6 +63,7 @@ Operations are:
 not separate from architecture.
 
 Operational concerns must influence:
+
 - module design
 - event systems
 - storage systems
@@ -68,6 +75,7 @@ Operational concerns must influence:
 ## 2.3 CA PERSPECTIVE
 
 Operational failures must NEVER:
+
 - silently corrupt accounting,
 - lose financial records,
 - break ledger integrity.
@@ -80,12 +88,14 @@ non-negotiable.
 ## 2.4 MBA PERSPECTIVE
 
 Operational excellence improves:
+
 - business continuity
 - customer trust
 - operational efficiency
 - profitability
 
 Downtime directly affects:
+
 - revenue
 - customer retention
 - operational confidence
@@ -122,6 +132,7 @@ System healthy and operational.
 Partial subsystem failure.
 
 Examples:
+
 - analytics unavailable
 - plugin crash
 - dashboard lag
@@ -141,6 +152,7 @@ System replaying WAL or restoring state.
 Critical protection mode.
 
 Triggered by:
+
 - storage corruption
 - accounting integrity issues
 - recovery validation failures
@@ -152,6 +164,7 @@ Triggered by:
 Administrative operations active.
 
 Examples:
+
 - backup
 - migration
 - diagnostics
@@ -215,6 +228,7 @@ Shutdown Request
 # 6.2 SHUTDOWN GUARANTEES
 
 System must guarantee:
+
 - no partial transactions
 - WAL consistency
 - accounting durability
@@ -259,6 +273,7 @@ memory_health
 # 8.1 STORAGE GUARANTEES
 
 Storage must provide:
+
 - atomic writes
 - checksums
 - deterministic recovery
@@ -301,7 +316,7 @@ Detect
 
 Core Principle:
 
-> Durability before visibility. 
+> Durability before visibility.
 
 No operation becomes visible:
 before WAL append success.
@@ -340,6 +355,7 @@ Read WAL
 # 10.1 BACKUP GOALS
 
 Backups must support:
+
 - disaster recovery
 - rollback
 - migration
@@ -378,6 +394,7 @@ Pause Writes
 # 11.1 RECOVERY GOALS
 
 System recovery must be:
+
 - deterministic
 - automated
 - auditable
@@ -411,6 +428,78 @@ Mandatory validations:
 
 ---
 
+# 11.4 MVP RECOVERY DIAGNOSTICS
+
+Automatic recovery is allowed only when pending WAL transactions have no durable business side effects.
+
+Safe automatic recovery:
+
+```text
+Pending WAL exists
+-> No matching journal, stock movement, invoice, item, or invoice line exists
+-> Roll back pending WAL
+-> Re-run startup health
+```
+
+Manual reconciliation required:
+
+```text
+Pending WAL exists
+-> Matching durable business records already exist
+-> Refuse automatic rollback
+-> Report transaction id, operation, correlation id, and side effects
+-> Operator or support engineer reconciles from append-only records
+```
+
+The recovery diagnostics API is:
+
+```text
+inspect_application_recovery(data_root)
+export_application_recovery_diagnostics(data_root)
+```
+
+The exported payload is intended for CLI/UI recovery screens and must remain usable even when normal application startup is blocked.
+
+The MVP recovery CLI is:
+
+```bash
+uv run bms-recovery inspect --data-root data
+uv run bms-recovery report --data-root data
+uv run bms-recovery recover --data-root data
+uv run bms-recovery reconcile --data-root data \
+  --transaction-id txn_invoice_partial \
+  --decision accepted_existing_records \
+  --actor-id usr_admin \
+  --reason "Reviewed durable records and accepted existing state"
+uv run bms-recovery resolve-accounting-adjustment --data-root data \
+  --transaction-id txn_invoice_partial \
+  --actor-id usr_admin \
+  --reason "Posted correction journal" \
+  --journal-json '{"journal_id":"JRN-REC-1","period_id":"FY2026-05","timestamp":"2026-05-14T03:05:00Z","actor_id":"usr_admin","source_module":"recovery","source_document_id":"txn_invoice_partial","correlation_id":"corr_txn_invoice_partial","description":"Recovery accounting adjustment","lines":[{"account_code":"4000","debit_minor":100000,"currency":"INR"},{"account_code":"2100","debit_minor":18000,"currency":"INR"},{"account_code":"1000","credit_minor":118000,"currency":"INR"}]}'
+```
+
+MVP reconciliation decisions:
+
+| Decision | Resolves Pending WAL | Meaning |
+|---|---:|---|
+| `accepted_existing_records` | yes | Support/admin has reviewed the durable records and accepts them as the recovery state. |
+| `requires_accounting_adjustment` | after correction journal | Recovery is documented and remains blocked until `resolve-accounting-adjustment` posts a valid recovery journal. |
+| `requires_restore_from_backup` | no | Recovery is documented but the site must restore from backup. |
+| `voided_as_incomplete` | no | Recovery is documented as incomplete; follow-up implementation must define safe voiding behavior before this resolves WAL. |
+
+Exit codes:
+
+| Code | Meaning |
+|---|---|
+| 0 | command succeeded |
+| 2 | CLI or diagnostics error |
+| 3 | protected mode; automatic recovery is blocked |
+| 4 | manual reconciliation is required |
+
+The `report` command is read-only and intended as the support artifact for blocked startup incidents. It includes startup health, pending WAL transactions, side effects, reconciliation history, correction journals, recovery audit/event references, and a recommended next action.
+
+---
+
 # 12. ACCOUNTING OPERATIONS
 
 Critical financial operational guarantees.
@@ -420,6 +509,7 @@ Critical financial operational guarantees.
 # 12.1 ACCOUNTING SAFETY RULES
 
 Accounting operations must NEVER:
+
 - partially commit
 - bypass WAL
 - skip audit logs
@@ -446,6 +536,7 @@ Accounting Failure
 # 13.1 OBSERVABILITY PILLARS
 
 Need:
+
 - logs
 - metrics
 - tracing
@@ -456,6 +547,7 @@ Need:
 # 13.2 LOGGING REQUIREMENTS
 
 All critical operations require:
+
 - structured logs
 - timestamps
 - correlation IDs
@@ -495,6 +587,7 @@ All critical operations require:
 # 13.4 DISTRIBUTED TRACING (FUTURE)
 
 Future support:
+
 - correlation IDs
 - event tracing
 - workflow tracing
@@ -509,6 +602,7 @@ Future support:
 # 14.1 EVENT GUARANTEES
 
 Need:
+
 - ordered delivery
 - retry support
 - dead-letter queues
@@ -535,6 +629,7 @@ Handler Failure
 # 15.1 PLUGIN SAFETY
 
 Plugins must NEVER:
+
 - crash core runtime
 - corrupt accounting
 - bypass APIs
@@ -544,6 +639,7 @@ Plugins must NEVER:
 # 15.2 PLUGIN MONITORING
 
 Monitor:
+
 - crash count
 - execution latency
 - memory usage
@@ -570,6 +666,7 @@ Plugin Failure
 # 16.1 DEPLOYMENT GOALS
 
 Deployment must support:
+
 - rollback
 - offline installation
 - transactional updates
@@ -609,6 +706,7 @@ Upgrade Failure
 # 17.1 CONFIG RULES
 
 Configuration must support:
+
 - schema validation
 - versioning
 - rollback
@@ -634,6 +732,7 @@ Config Change
 # 18.1 MEMORY GOALS
 
 Need:
+
 - deterministic allocations
 - minimal fragmentation
 - leak detection
@@ -682,6 +781,7 @@ Background Scheduler
 # 19.2 THREADING RULES
 
 UI thread must NEVER:
+
 - block on storage
 - perform heavy analytics
 - wait on plugins
@@ -695,6 +795,7 @@ UI thread must NEVER:
 # 20.1 SECURITY GOALS
 
 Need:
+
 - RBAC
 - session management
 - audit logging
@@ -713,6 +814,7 @@ AUDIT_TAMPERING_DETECTED
 ```
 
 must trigger:
+
 - alerts
 - diagnostics
 - audit workflows
@@ -726,6 +828,7 @@ must trigger:
 # 21.1 DIAGNOSTICS GOALS
 
 Support:
+
 - crash analysis
 - operational debugging
 - recovery validation
@@ -736,6 +839,7 @@ Support:
 # 21.2 DIAGNOSTICS OUTPUT
 
 Need:
+
 - crash dumps
 - health reports
 - recovery logs
@@ -761,6 +865,7 @@ Need:
 # 22.2 ALERT CHANNELS
 
 Future support:
+
 - desktop alerts
 - email
 - SMS
@@ -790,6 +895,7 @@ Business operations must measure:
 # 24.1 DISASTER TYPES
 
 Supported scenarios:
+
 - storage corruption
 - power failure
 - failed deployment
@@ -820,6 +926,7 @@ Incident Detection
 Minimal operational mode.
 
 Enabled when:
+
 - plugins fail
 - recovery incomplete
 - diagnostics active
@@ -831,6 +938,7 @@ Enabled when:
 Protection mode.
 
 Enabled when:
+
 - accounting inconsistency detected
 - storage corruption detected
 
@@ -845,6 +953,7 @@ Administrative operations only.
 # 26. FUTURE CLOUD OPERATIONS
 
 Future-ready support for:
+
 - remote telemetry
 - centralized monitoring
 - distributed tracing
@@ -855,6 +964,7 @@ Future-ready support for:
 # 27. FUTURE MICROSERVICE OPERATIONS
 
 Architecture already supports:
+
 - event boundaries
 - isolated modules
 - observability hooks
@@ -875,6 +985,7 @@ This operational architecture establishes:
 - long-term maintainability.
 
 Core operational goals:
+
 - survivability
 - recoverability
 - observability

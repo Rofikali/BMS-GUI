@@ -51,14 +51,5 @@ jobs:
       - name: Sync Python environment
         run: uv sync --locked
 
-      - name: Configure native core
-        run: cmake -S . -B build -G Ninja
-
-      - name: Build native core
-        run: cmake --build build
-
-      - name: Run native tests
-        run: ctest --test-dir build --output-on-failure
-
-      - name: Run Python tests
-        run: uv run python -m unittest discover tests
+      - name: Run verification gate
+        run: ./scripts/verify
