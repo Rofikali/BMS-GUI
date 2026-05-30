@@ -101,6 +101,8 @@ def build_main_window_class():
             status_bar.addPermanentWidget(self.currency_input)
             status_bar.addPermanentWidget(self.actor_selector)
             self.setStatusBar(status_bar)
+            self._connect_action_state_inputs()
+            self._sync_action_states()
             self.refresh_reports()
 
         def _build_inventory_tab(self):
@@ -320,16 +322,16 @@ def build_main_window_class():
 
         def register_item(self) -> None:
             try:
-                item_id = self.item_id_input.text().strip()
+                item_id = self._required_text("Item ID", self.item_id_input)
                 self.facade.register_item(
                     {
                         "item": {
                             "item_id": item_id,
-                            "sku": self.sku_input.text().strip(),
-                            "name": self.item_name_input.text().strip(),
+                            "sku": self._required_text("SKU", self.sku_input),
+                            "name": self._required_text("Name", self.item_name_input),
                             "active": True,
                         },
-                        "actor_id": self._current_actor_id(),
+                        "actor_id": self._required_actor_id(),
                         "created_at": _timestamp(),
                         "correlation_id": f"corr_item_{item_id}",
                     }
@@ -343,7 +345,7 @@ def build_main_window_class():
                             "movement_type": "adjustment",
                             "quantity_delta": opening_stock,
                             "timestamp": _timestamp(),
-                            "actor_id": self._current_actor_id(),
+                            "actor_id": self._required_actor_id(),
                             "reason": "opening stock",
                             "source_module": "inventory",
                             "source_document_id": f"OPEN-{item_id}",
@@ -353,29 +355,36 @@ def build_main_window_class():
                 self.invoice_item_id_input.setText(item_id)
                 self.refund_item_id_input.setText(item_id)
                 self._set_status(f"Registered {item_id}")
+                self._sync_action_states()
                 self.refresh_reports()
             except Exception as exc:
                 self._show_error(exc)
 
         def create_invoice(self) -> None:
             try:
-                invoice_id = self.invoice_id_input.text().strip()
+                invoice_id = self._required_text("Invoice ID", self.invoice_id_input)
                 result = self.facade.create_invoice(
                     {
                         "invoice_id": invoice_id,
-                        "customer_id": self.customer_id_input.text().strip(),
+                        "customer_id": self._required_text(
+                            "Customer ID", self.customer_id_input
+                        ),
                         "period_id": self._current_period_id(),
                         "timestamp": _timestamp(),
-                        "actor_id": self._current_actor_id(),
+                        "actor_id": self._required_actor_id(),
                         "correlation_id": f"corr_{invoice_id}",
                         "payment_method": self.invoice_payment_method_input.currentText(),
                         "currency": self._current_currency(),
                         "lines": [
                             {
-                                "item_id": self.invoice_item_id_input.text().strip(),
+                                "item_id": self._required_text(
+                                    "Invoice item ID", self.invoice_item_id_input
+                                ),
                                 "quantity": self.invoice_quantity_input.value(),
                                 "unit_price_minor": self.invoice_unit_price_input.value(),
-                                "description": self.item_name_input.text().strip(),
+                                "description": self._required_text(
+                                    "Name", self.item_name_input
+                                ),
                             }
                         ],
                     }
@@ -388,29 +397,38 @@ def build_main_window_class():
                 self._set_status(f"Created invoice {invoice_id}")
                 self.invoice_id_input.setText(_new_business_id("INV"))
                 self.refund_id_input.setText(_new_business_id("REF"))
+                self._sync_action_states()
                 self.refresh_reports()
             except Exception as exc:
                 self._show_error(exc)
 
         def create_refund(self) -> None:
             try:
-                refund_id = self.refund_id_input.text().strip()
+                refund_id = self._required_text("Refund ID", self.refund_id_input)
                 result = self.facade.create_refund(
                     {
                         "refund_id": refund_id,
-                        "original_invoice_id": self.refund_invoice_id_input.text().strip(),
+                        "original_invoice_id": self._required_text(
+                            "Original invoice", self.refund_invoice_id_input
+                        ),
                         "period_id": self._current_period_id(),
                         "timestamp": _timestamp(),
-                        "actor_id": self._current_actor_id(),
+                        "actor_id": self._required_actor_id(),
                         "correlation_id": f"corr_{refund_id}",
                         "currency": self._current_currency(),
-                        "reason": self.refund_reason_input.text().strip(),
+                        "reason": self._required_text(
+                            "Refund reason", self.refund_reason_input
+                        ),
                         "lines": [
                             {
-                                "item_id": self.refund_item_id_input.text().strip(),
+                                "item_id": self._required_text(
+                                    "Refund item ID", self.refund_item_id_input
+                                ),
                                 "quantity": self.refund_quantity_input.value(),
                                 "unit_price_minor": self.refund_unit_price_input.value(),
-                                "description": self.item_name_input.text().strip(),
+                                "description": self._required_text(
+                                    "Name", self.item_name_input
+                                ),
                                 "restock": self.refund_restock_input.isChecked(),
                             }
                         ],
@@ -422,6 +440,7 @@ def build_main_window_class():
                 self.refund_total_label.setText(str(result["total_minor"]))
                 self._set_status(f"Created refund {refund_id}")
                 self.refund_id_input.setText(_new_business_id("REF"))
+                self._sync_action_states()
                 self.refresh_reports()
             except Exception as exc:
                 self._show_error(exc)
@@ -430,7 +449,7 @@ def build_main_window_class():
             try:
                 result = self.facade.create_backup(
                     {
-                        "actor_id": self._current_actor_id(),
+                        "actor_id": self._required_actor_id(),
                         "created_at": _timestamp(),
                     }
                 )
@@ -464,9 +483,13 @@ def build_main_window_class():
             try:
                 result = self.facade.restore_backup(
                     {
-                        "actor_id": self._current_actor_id(),
-                        "backup_path": self.restore_backup_path_input.text().strip(),
-                        "restore_root": self.restore_target_input.text().strip(),
+                        "actor_id": self._required_actor_id(),
+                        "backup_path": self._required_text(
+                            "Backup path", self.restore_backup_path_input
+                        ),
+                        "restore_root": self._required_text(
+                            "Restore target", self.restore_target_input
+                        ),
                     }
                 )
                 _set_rows(
@@ -482,6 +505,84 @@ def build_main_window_class():
                 self._set_status(f"Restore validated at {result['restored_root']}")
             except Exception as exc:
                 self._show_error(exc)
+
+        def _connect_action_state_inputs(self) -> None:
+            for widget in (
+                self.item_id_input,
+                self.sku_input,
+                self.item_name_input,
+                self.invoice_id_input,
+                self.customer_id_input,
+                self.invoice_item_id_input,
+                self.refund_id_input,
+                self.refund_invoice_id_input,
+                self.refund_item_id_input,
+                self.refund_reason_input,
+                self.period_input,
+                self.currency_input,
+                self.restore_backup_path_input,
+                self.restore_target_input,
+            ):
+                widget.textChanged.connect(self._sync_action_states)
+            self.actor_selector.currentIndexChanged.connect(self._sync_action_states)
+
+        def _sync_action_states(self, *_args) -> None:
+            action_requirements = (
+                (
+                    self.register_item_button,
+                    (
+                        ("Operator", self._current_actor_id()),
+                        ("Item ID", self.item_id_input.text()),
+                        ("SKU", self.sku_input.text()),
+                        ("Name", self.item_name_input.text()),
+                    ),
+                ),
+                (
+                    self.create_invoice_button,
+                    (
+                        ("Operator", self._current_actor_id()),
+                        ("Invoice ID", self.invoice_id_input.text()),
+                        ("Customer ID", self.customer_id_input.text()),
+                        ("Item ID", self.invoice_item_id_input.text()),
+                        ("Name", self.item_name_input.text()),
+                        ("Period", self.period_input.text()),
+                        ("Currency", self.currency_input.text()),
+                    ),
+                ),
+                (
+                    self.create_refund_button,
+                    (
+                        ("Operator", self._current_actor_id()),
+                        ("Refund ID", self.refund_id_input.text()),
+                        ("Original invoice", self.refund_invoice_id_input.text()),
+                        ("Item ID", self.refund_item_id_input.text()),
+                        ("Name", self.item_name_input.text()),
+                        ("Reason", self.refund_reason_input.text()),
+                        ("Period", self.period_input.text()),
+                        ("Currency", self.currency_input.text()),
+                    ),
+                ),
+                (
+                    self.backup_button,
+                    (("Operator", self._current_actor_id()),),
+                ),
+                (
+                    self.restore_button,
+                    (
+                        ("Operator", self._current_actor_id()),
+                        ("Backup path", self.restore_backup_path_input.text()),
+                        ("Restore target", self.restore_target_input.text()),
+                    ),
+                ),
+            )
+            for button, requirements in action_requirements:
+                missing = [
+                    label for label, value in requirements if not str(value).strip()
+                ]
+                button.setEnabled(not missing)
+                button.setToolTip(
+                    "" if not missing else "Required: " + ", ".join(missing)
+                )
 
         def refresh_reports(self) -> None:
             period_id = self._current_period_id()
@@ -595,6 +696,12 @@ def build_main_window_class():
         def _current_actor_id(self) -> str:
             return str(self.actor_selector.currentData() or "")
 
+        def _required_actor_id(self) -> str:
+            actor_id = self._current_actor_id()
+            if not actor_id:
+                raise ValueError("Operator is required")
+            return actor_id
+
         def _apply_stock_selection(self) -> None:
             selected_row = self.stock_table.currentRow()
             if selected_row < 0 or not hasattr(self, "invoice_item_id_input"):
@@ -633,17 +740,18 @@ def build_main_window_class():
                 self.refund_quantity_input.setValue(max(int(remaining), 1))
 
         def _current_period_id(self) -> str:
-            period_id = self.period_input.text().strip()
-            if not period_id:
-                raise ValueError("Period is required")
-            return period_id
+            return self._required_text("Period", self.period_input)
 
         def _current_currency(self) -> str:
-            currency = self.currency_input.text().strip().upper()
-            if not currency:
-                raise ValueError("Currency is required")
+            currency = self._required_text("Currency", self.currency_input).upper()
             self.currency_input.setText(currency)
             return currency
+
+        def _required_text(self, label: str, widget) -> str:
+            value = widget.text().strip()
+            if not value:
+                raise ValueError(f"{label} is required")
+            return value
 
         def _set_status(self, message: str) -> None:
             self.status_label.setText(message)

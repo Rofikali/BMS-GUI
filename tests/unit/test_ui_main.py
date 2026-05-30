@@ -137,11 +137,63 @@ class UiMainTests(unittest.TestCase):
         window.close()
         app.processEvents()
 
+    def test_main_window_disables_actions_when_required_inputs_are_missing(self) -> None:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            qt = ui_main._import_qt()
+        except SystemExit as exc:
+            self.skipTest(str(exc))
+
+        app = qt.QApplication.instance() or qt.QApplication([])
+        window = ui_main.create_main_window(facade=_CapturingFacade())
+
+        self.assertTrue(window.register_item_button.isEnabled())
+        self.assertTrue(window.create_invoice_button.isEnabled())
+        self.assertTrue(window.create_refund_button.isEnabled())
+        self.assertTrue(window.backup_button.isEnabled())
+        self.assertFalse(window.restore_button.isEnabled())
+        self.assertIn("Backup path", window.restore_button.toolTip())
+        self.assertIn("Restore target", window.restore_button.toolTip())
+
+        window.invoice_item_id_input.clear()
+
+        self.assertFalse(window.create_invoice_button.isEnabled())
+        self.assertIn("Item ID", window.create_invoice_button.toolTip())
+        self.assertTrue(window.register_item_button.isEnabled())
+
+        window.invoice_item_id_input.setText("ITEM-READY")
+
+        self.assertTrue(window.create_invoice_button.isEnabled())
+        self.assertEqual(window.create_invoice_button.toolTip(), "")
+        window.close()
+        app.processEvents()
+
+    def test_main_window_disables_operator_actions_without_active_operator(self) -> None:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            qt = ui_main._import_qt()
+        except SystemExit as exc:
+            self.skipTest(str(exc))
+
+        app = qt.QApplication.instance() or qt.QApplication([])
+        window = ui_main.create_main_window(
+            facade=_CapturingFacade(actor_sessions=[])
+        )
+
+        self.assertFalse(window.register_item_button.isEnabled())
+        self.assertFalse(window.create_invoice_button.isEnabled())
+        self.assertFalse(window.create_refund_button.isEnabled())
+        self.assertFalse(window.backup_button.isEnabled())
+        self.assertIn("Operator", window.backup_button.toolTip())
+        window.close()
+        app.processEvents()
+
 
 class _CapturingFacade:
     def __init__(
         self,
         *,
+        actor_sessions: list[dict[str, object]] | None = None,
         invoice_rows: list[dict[str, object]] | None = None,
         refund_availability_rows: list[dict[str, object]] | None = None,
         stock_rows: list[dict[str, object]] | None = None,
@@ -149,11 +201,14 @@ class _CapturingFacade:
         self.created_invoice: dict[str, object] = {}
         self.created_refund: dict[str, object] = {}
         self.tax_report_calls: list[tuple[str, str]] = []
+        self.actor_session_rows = actor_sessions
         self.invoice_rows = invoice_rows or []
         self.refund_availability_rows = refund_availability_rows or []
         self.stock_rows = stock_rows or []
 
     def actor_sessions(self) -> list[dict[str, object]]:
+        if self.actor_session_rows is not None:
+            return self.actor_session_rows
         return [
             {
                 "actor_id": "usr_admin",
