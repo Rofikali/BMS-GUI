@@ -64,6 +64,8 @@ def build_main_window_class():
             )
             self.setWindowTitle("BMS-GUI")
             self.resize(1160, 760)
+            self._initial_item_id = _new_business_id("ITEM")
+            self._initial_invoice_id = _new_business_id("INV")
 
             self.status_label = qt.QLabel("Ready")
             self.status_label.setTextInteractionFlags(
@@ -77,6 +79,12 @@ def build_main_window_class():
                 )
             if self.actor_selector.count() == 0:
                 self.actor_selector.addItem("No active operator", "")
+            self.period_input = qt.QLineEdit("FY2026-05")
+            self.period_input.setMaximumWidth(120)
+            self.period_input.editingFinished.connect(self._refresh_reports_from_input)
+            self.currency_input = qt.QLineEdit("INR")
+            self.currency_input.setMaximumWidth(70)
+            self.currency_input.editingFinished.connect(self._refresh_reports_from_input)
 
             tabs = qt.QTabWidget()
             tabs.addTab(self._build_inventory_tab(), "Inventory")
@@ -87,6 +95,10 @@ def build_main_window_class():
 
             status_bar = qt.QStatusBar()
             status_bar.addWidget(self.status_label, 1)
+            status_bar.addPermanentWidget(qt.QLabel("Period"))
+            status_bar.addPermanentWidget(self.period_input)
+            status_bar.addPermanentWidget(qt.QLabel("Currency"))
+            status_bar.addPermanentWidget(self.currency_input)
             status_bar.addPermanentWidget(self.actor_selector)
             self.setStatusBar(status_bar)
             self.refresh_reports()
@@ -98,9 +110,9 @@ def build_main_window_class():
 
             form_group = qt.QGroupBox("Item Setup")
             form = qt.QFormLayout(form_group)
-            self.item_id_input = qt.QLineEdit("ITEM-1")
-            self.sku_input = qt.QLineEdit("SKU-1")
-            self.item_name_input = qt.QLineEdit("Test Item")
+            self.item_id_input = qt.QLineEdit(self._initial_item_id)
+            self.sku_input = qt.QLineEdit(self._initial_item_id.replace("ITEM", "SKU", 1))
+            self.item_name_input = qt.QLineEdit("New Item")
             self.opening_stock_input = _spin_box(qt, 0, 1_000_000, 5)
             form.addRow("Item ID", self.item_id_input)
             form.addRow("SKU", self.sku_input)
@@ -122,6 +134,7 @@ def build_main_window_class():
             self.stock_table = _table(
                 qt, ["Item", "SKU", "Name", "On hand", "Low stock"]
             )
+            self.stock_table.itemSelectionChanged.connect(self._apply_stock_selection)
             stock_layout.addWidget(self.stock_table)
 
             layout.addWidget(form_group, 0, 0)
@@ -135,16 +148,20 @@ def build_main_window_class():
 
             form_group = qt.QGroupBox("Invoice")
             form = qt.QFormLayout(form_group)
-            self.invoice_id_input = qt.QLineEdit("INV-1001")
-            self.customer_id_input = qt.QLineEdit("CUS-1")
-            self.invoice_item_id_input = qt.QLineEdit("ITEM-1")
+            self.invoice_id_input = qt.QLineEdit(self._initial_invoice_id)
+            self.customer_id_input = qt.QLineEdit("WALK-IN")
+            self.invoice_item_id_input = qt.QLineEdit(self._initial_item_id)
             self.invoice_quantity_input = _spin_box(qt, 1, 1_000_000, 2)
             self.invoice_unit_price_input = _spin_box(qt, 0, 1_000_000_000, 50000)
+            self.invoice_payment_method_input = qt.QComboBox()
+            for payment_method in ("cash", "card", "upi", "bank_transfer"):
+                self.invoice_payment_method_input.addItem(payment_method)
             form.addRow("Invoice ID", self.invoice_id_input)
             form.addRow("Customer ID", self.customer_id_input)
             form.addRow("Item ID", self.invoice_item_id_input)
             form.addRow("Quantity", self.invoice_quantity_input)
             form.addRow("Unit price minor", self.invoice_unit_price_input)
+            form.addRow("Payment method", self.invoice_payment_method_input)
 
             actions = qt.QHBoxLayout()
             self.create_invoice_button = qt.QPushButton("Create")
@@ -172,11 +189,12 @@ def build_main_window_class():
 
             refund_group = qt.QGroupBox("Refund")
             refund_form = qt.QFormLayout(refund_group)
-            self.refund_id_input = qt.QLineEdit("REF-1001")
-            self.refund_invoice_id_input = qt.QLineEdit("INV-1001")
-            self.refund_item_id_input = qt.QLineEdit("ITEM-1")
+            self.refund_id_input = qt.QLineEdit(_new_business_id("REF"))
+            self.refund_invoice_id_input = qt.QLineEdit(self._initial_invoice_id)
+            self.refund_item_id_input = qt.QLineEdit(self._initial_item_id)
             self.refund_quantity_input = _spin_box(qt, 1, 1_000_000, 1)
             self.refund_unit_price_input = _spin_box(qt, 0, 1_000_000_000, 50000)
+            self.refund_reason_input = qt.QLineEdit("customer return")
             self.refund_restock_input = qt.QCheckBox()
             self.refund_restock_input.setChecked(True)
             refund_form.addRow("Refund ID", self.refund_id_input)
@@ -184,6 +202,7 @@ def build_main_window_class():
             refund_form.addRow("Item ID", self.refund_item_id_input)
             refund_form.addRow("Quantity", self.refund_quantity_input)
             refund_form.addRow("Unit price minor", self.refund_unit_price_input)
+            refund_form.addRow("Reason", self.refund_reason_input)
             refund_form.addRow("Restock", self.refund_restock_input)
 
             refund_actions = qt.QHBoxLayout()
@@ -231,18 +250,24 @@ def build_main_window_class():
             self.report_trial_balance_label = qt.QLabel("Unknown")
             summary.addRow("Invoice total", self.report_invoice_total_label)
             summary.addRow("Refund total", self.report_refund_total_label)
-            summary.addRow("Refundable remaining", self.report_refundable_remaining_label)
+            summary.addRow(
+                "Refundable remaining", self.report_refundable_remaining_label
+            )
             summary.addRow("Tax payable", self.report_tax_payable_label)
             summary.addRow("Trial balance", self.report_trial_balance_label)
 
             self.invoice_table = _table(
                 qt, ["Invoice", "Customer", "Subtotal", "Tax", "Total"]
             )
+            self.invoice_table.itemSelectionChanged.connect(self._apply_invoice_selection)
             self.refund_table = _table(
                 qt, ["Refund", "Invoice", "Reason", "Subtotal", "Tax", "Total"]
             )
             self.refund_availability_table = _table(
                 qt, ["Invoice", "Item", "Unit price", "Sold", "Refunded", "Remaining"]
+            )
+            self.refund_availability_table.itemSelectionChanged.connect(
+                self._apply_refund_availability_selection
             )
             self.ledger_table = _table(
                 qt, ["Account", "Name", "Debit", "Credit", "Balance"]
@@ -325,6 +350,8 @@ def build_main_window_class():
                             "correlation_id": f"corr_open_{item_id}",
                         }
                     )
+                self.invoice_item_id_input.setText(item_id)
+                self.refund_item_id_input.setText(item_id)
                 self._set_status(f"Registered {item_id}")
                 self.refresh_reports()
             except Exception as exc:
@@ -337,12 +364,12 @@ def build_main_window_class():
                     {
                         "invoice_id": invoice_id,
                         "customer_id": self.customer_id_input.text().strip(),
-                        "period_id": "FY2026-05",
+                        "period_id": self._current_period_id(),
                         "timestamp": _timestamp(),
                         "actor_id": self._current_actor_id(),
                         "correlation_id": f"corr_{invoice_id}",
-                        "payment_method": "cash",
-                        "currency": "INR",
+                        "payment_method": self.invoice_payment_method_input.currentText(),
+                        "currency": self._current_currency(),
                         "lines": [
                             {
                                 "item_id": self.invoice_item_id_input.text().strip(),
@@ -357,7 +384,10 @@ def build_main_window_class():
                 self.invoice_subtotal_label.setText(str(result["subtotal_minor"]))
                 self.invoice_tax_label.setText(str(result["tax_minor"]))
                 self.invoice_total_label.setText(str(result["total_minor"]))
+                self.refund_invoice_id_input.setText(str(result["invoice_id"]))
                 self._set_status(f"Created invoice {invoice_id}")
+                self.invoice_id_input.setText(_new_business_id("INV"))
+                self.refund_id_input.setText(_new_business_id("REF"))
                 self.refresh_reports()
             except Exception as exc:
                 self._show_error(exc)
@@ -369,12 +399,12 @@ def build_main_window_class():
                     {
                         "refund_id": refund_id,
                         "original_invoice_id": self.refund_invoice_id_input.text().strip(),
-                        "period_id": "FY2026-05",
+                        "period_id": self._current_period_id(),
                         "timestamp": _timestamp(),
                         "actor_id": self._current_actor_id(),
                         "correlation_id": f"corr_{refund_id}",
-                        "currency": "INR",
-                        "reason": "customer return",
+                        "currency": self._current_currency(),
+                        "reason": self.refund_reason_input.text().strip(),
                         "lines": [
                             {
                                 "item_id": self.refund_item_id_input.text().strip(),
@@ -391,6 +421,7 @@ def build_main_window_class():
                 self.refund_tax_label.setText(str(result["tax_minor"]))
                 self.refund_total_label.setText(str(result["total_minor"]))
                 self._set_status(f"Created refund {refund_id}")
+                self.refund_id_input.setText(_new_business_id("REF"))
                 self.refresh_reports()
             except Exception as exc:
                 self._show_error(exc)
@@ -453,13 +484,15 @@ def build_main_window_class():
                 self._show_error(exc)
 
         def refresh_reports(self) -> None:
-            invoice_report = self.facade.invoice_report("FY2026-05")
-            refund_report = self.facade.refund_report("FY2026-05")
-            refund_availability = self.facade.refund_availability_report("FY2026-05")
+            period_id = self._current_period_id()
+            currency = self._current_currency()
+            invoice_report = self.facade.invoice_report(period_id)
+            refund_report = self.facade.refund_report(period_id)
+            refund_availability = self.facade.refund_availability_report(period_id)
             stock_report = self.facade.stock_report(low_stock_threshold=3)
-            ledger_report = self.facade.ledger_report("FY2026-05")
-            tax_report = self.facade.tax_report("FY2026-05")
-            trial_balance = self.facade.trial_balance_report("FY2026-05")
+            ledger_report = self.facade.ledger_report(period_id)
+            tax_report = self.facade.tax_report(period_id, currency=currency)
+            trial_balance = self.facade.trial_balance_report(period_id)
 
             invoice_total = sum(
                 total["total_minor"] for total in invoice_report["totals"]
@@ -553,8 +586,64 @@ def build_main_window_class():
                 ],
             )
 
+        def _refresh_reports_from_input(self) -> None:
+            try:
+                self.refresh_reports()
+            except Exception as exc:
+                self._show_error(exc)
+
         def _current_actor_id(self) -> str:
             return str(self.actor_selector.currentData() or "")
+
+        def _apply_stock_selection(self) -> None:
+            selected_row = self.stock_table.currentRow()
+            if selected_row < 0 or not hasattr(self, "invoice_item_id_input"):
+                return
+            item_id = _table_text(self.stock_table, selected_row, 0)
+            item_name = _table_text(self.stock_table, selected_row, 2)
+            if item_id:
+                self.invoice_item_id_input.setText(item_id)
+                self.refund_item_id_input.setText(item_id)
+            if item_name:
+                self.item_name_input.setText(item_name)
+
+        def _apply_invoice_selection(self) -> None:
+            selected_row = self.invoice_table.currentRow()
+            if selected_row < 0:
+                return
+            invoice_id = _table_text(self.invoice_table, selected_row, 0)
+            if invoice_id:
+                self.refund_invoice_id_input.setText(invoice_id)
+
+        def _apply_refund_availability_selection(self) -> None:
+            selected_row = self.refund_availability_table.currentRow()
+            if selected_row < 0:
+                return
+            invoice_id = _table_text(self.refund_availability_table, selected_row, 0)
+            item_id = _table_text(self.refund_availability_table, selected_row, 1)
+            unit_price = _table_text(self.refund_availability_table, selected_row, 2)
+            remaining = _table_text(self.refund_availability_table, selected_row, 5)
+            if invoice_id:
+                self.refund_invoice_id_input.setText(invoice_id)
+            if item_id:
+                self.refund_item_id_input.setText(item_id)
+            if unit_price.isdigit():
+                self.refund_unit_price_input.setValue(int(unit_price))
+            if remaining.isdigit():
+                self.refund_quantity_input.setValue(max(int(remaining), 1))
+
+        def _current_period_id(self) -> str:
+            period_id = self.period_input.text().strip()
+            if not period_id:
+                raise ValueError("Period is required")
+            return period_id
+
+        def _current_currency(self) -> str:
+            currency = self.currency_input.text().strip().upper()
+            if not currency:
+                raise ValueError("Currency is required")
+            self.currency_input.setText(currency)
+            return currency
 
         def _set_status(self, message: str) -> None:
             self.status_label.setText(message)
@@ -595,6 +684,11 @@ def _set_rows(qt: SimpleNamespace, table, rows: list[list[str]]) -> None:
             table.setItem(row_index, column_index, item)
 
 
+def _table_text(table, row: int, column: int) -> str:
+    item = table.item(row, column)
+    return item.text().strip() if item is not None else ""
+
+
 def _spin_box(qt: SimpleNamespace, minimum: int, maximum: int, value: int):
     spin_box = qt.QSpinBox()
     spin_box.setRange(minimum, maximum)
@@ -605,6 +699,11 @@ def _spin_box(qt: SimpleNamespace, minimum: int, maximum: int, value: int):
 
 def _timestamp() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _new_business_id(prefix: str) -> str:
+    timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
+    return f"{prefix}-{timestamp}-{uuid4().hex[:6].upper()}"
 
 
 def _default_data_root() -> Path:
@@ -619,7 +718,7 @@ def _stylesheet() -> str:
     QTabBar::tab:selected { background: #ffffff; border-bottom-color: #ffffff; }
     QGroupBox { font-weight: 650; border: 1px solid #d7dde5; margin-top: 12px; padding: 12px 10px 10px 10px; background: #ffffff; }
     QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }
-    QLineEdit, QSpinBox { padding: 6px 8px; border: 1px solid #b9c3cf; background: #ffffff; min-height: 22px; }
+    QLineEdit, QSpinBox, QComboBox { padding: 6px 8px; border: 1px solid #b9c3cf; background: #ffffff; min-height: 22px; }
     QPushButton { padding: 7px 13px; border: 1px solid #9aa7b5; background: #ffffff; min-width: 86px; }
     QPushButton:hover { background: #eef3f8; }
     QHeaderView::section { background: #edf1f5; border: 0; border-bottom: 1px solid #cfd7e2; padding: 6px; font-weight: 650; }

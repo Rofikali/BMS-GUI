@@ -9,6 +9,11 @@ from bms.ui import main as ui_main
 
 
 class UiMainTests(unittest.TestCase):
+    def test_new_business_id_uses_prefix_timestamp_and_short_suffix(self) -> None:
+        business_id = ui_main._new_business_id("INV")
+
+        self.assertRegex(business_id, r"^INV-\d{14}-[0-9A-F]{6}$")
+
     def test_main_window_runs_facade_backed_flow_when_qt_is_available(self) -> None:
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         try:
@@ -43,6 +48,165 @@ class UiMainTests(unittest.TestCase):
             self.assertEqual(window.status_label.text(), f"Restore validated at {Path(temp_dir) / 'restored'}")
             window.close()
             app.processEvents()
+
+    def test_main_window_uses_operator_period_currency_payment_and_refund_reason(self) -> None:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            qt = ui_main._import_qt()
+        except SystemExit as exc:
+            self.skipTest(str(exc))
+
+        app = qt.QApplication.instance() or qt.QApplication([])
+        facade = _CapturingFacade()
+        window = ui_main.create_main_window(facade=facade)
+
+        window.period_input.setText("FY2026-06")
+        window.currency_input.setText("usd")
+        window.invoice_payment_method_input.setCurrentText("card")
+        window.refund_reason_input.setText("damaged box")
+
+        window.create_invoice()
+        window.create_refund()
+        window.refresh_reports()
+
+        self.assertEqual(facade.created_invoice["period_id"], "FY2026-06")
+        self.assertEqual(facade.created_invoice["currency"], "USD")
+        self.assertEqual(facade.created_invoice["payment_method"], "card")
+        self.assertEqual(facade.created_refund["period_id"], "FY2026-06")
+        self.assertEqual(facade.created_refund["currency"], "USD")
+        self.assertEqual(facade.created_refund["reason"], "damaged box")
+        self.assertEqual(facade.tax_report_calls[-1], ("FY2026-06", "USD"))
+        self.assertEqual(window.currency_input.text(), "USD")
+        window.close()
+        app.processEvents()
+
+    def test_main_window_table_selections_fill_related_inputs(self) -> None:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            qt = ui_main._import_qt()
+        except SystemExit as exc:
+            self.skipTest(str(exc))
+
+        app = qt.QApplication.instance() or qt.QApplication([])
+        facade = _CapturingFacade(
+            invoice_rows=[
+                {
+                    "invoice_id": "INV-SEL",
+                    "customer_id": "WALK-IN",
+                    "subtotal_minor": 25000,
+                    "tax_minor": 4500,
+                    "total_minor": 29500,
+                }
+            ],
+            refund_availability_rows=[
+                {
+                    "invoice_id": "INV-SEL",
+                    "item_id": "ITEM-SEL",
+                    "unit_price_minor": 25000,
+                    "original_quantity": 3,
+                    "refunded_quantity": 1,
+                    "remaining_quantity": 2,
+                    "remaining_subtotal_minor": 50000,
+                }
+            ],
+            stock_rows=[
+                {
+                    "item_id": "ITEM-SEL",
+                    "sku": "SKU-SEL",
+                    "name": "Selected Item",
+                    "quantity_on_hand": 3,
+                    "low_stock": False,
+                }
+            ],
+        )
+        window = ui_main.create_main_window(facade=facade)
+
+        window.stock_table.setCurrentCell(0, 0)
+        self.assertEqual(window.invoice_item_id_input.text(), "ITEM-SEL")
+        self.assertEqual(window.refund_item_id_input.text(), "ITEM-SEL")
+        self.assertEqual(window.item_name_input.text(), "Selected Item")
+
+        window.invoice_table.setCurrentCell(0, 0)
+        self.assertEqual(window.refund_invoice_id_input.text(), "INV-SEL")
+
+        window.refund_availability_table.setCurrentCell(0, 0)
+        self.assertEqual(window.refund_invoice_id_input.text(), "INV-SEL")
+        self.assertEqual(window.refund_item_id_input.text(), "ITEM-SEL")
+        self.assertEqual(window.refund_unit_price_input.value(), 25000)
+        self.assertEqual(window.refund_quantity_input.value(), 2)
+        window.close()
+        app.processEvents()
+
+
+class _CapturingFacade:
+    def __init__(
+        self,
+        *,
+        invoice_rows: list[dict[str, object]] | None = None,
+        refund_availability_rows: list[dict[str, object]] | None = None,
+        stock_rows: list[dict[str, object]] | None = None,
+    ) -> None:
+        self.created_invoice: dict[str, object] = {}
+        self.created_refund: dict[str, object] = {}
+        self.tax_report_calls: list[tuple[str, str]] = []
+        self.invoice_rows = invoice_rows or []
+        self.refund_availability_rows = refund_availability_rows or []
+        self.stock_rows = stock_rows or []
+
+    def actor_sessions(self) -> list[dict[str, object]]:
+        return [
+            {
+                "actor_id": "usr_admin",
+                "display_name": "Admin",
+                "roles": ["admin"],
+            }
+        ]
+
+    def create_invoice(self, payload):
+        self.created_invoice = dict(payload)
+        return {
+            "invoice_id": payload["invoice_id"],
+            "subtotal_minor": 100000,
+            "tax_minor": 18000,
+            "total_minor": 118000,
+        }
+
+    def create_refund(self, payload):
+        self.created_refund = dict(payload)
+        return {
+            "refund_id": payload["refund_id"],
+            "subtotal_minor": 50000,
+            "tax_minor": 9000,
+            "total_minor": 59000,
+        }
+
+    def invoice_report(self, period_id):
+        return {
+            "rows": self.invoice_rows,
+            "totals": [],
+        }
+
+    def refund_report(self, period_id):
+        return {
+            "rows": [],
+            "totals": [],
+        }
+
+    def refund_availability_report(self, period_id):
+        return {"rows": self.refund_availability_rows}
+
+    def stock_report(self, *, low_stock_threshold: int = 0):
+        return {"rows": self.stock_rows}
+
+    def ledger_report(self, period_id):
+        return {"rows": []}
+
+    def tax_report(self, period_id, *, currency: str = "INR"):
+        self.tax_report_calls.append((period_id, currency))
+        return {"tax_payable_balance_minor": 0}
+
+    def trial_balance_report(self, period_id):
+        return {"is_balanced": True}
 
 
 if __name__ == "__main__":
