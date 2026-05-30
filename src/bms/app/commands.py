@@ -198,6 +198,12 @@ class ApplicationCommandFacade:
         except Exception as exc:
             raise map_application_error("reporting.refund_report", exc) from exc
 
+    def refund_availability_report(self, period_id: str | None = None) -> dict[str, Any]:
+        try:
+            return self.runtime.reporting.export_refund_availability_report(period_id)
+        except Exception as exc:
+            raise map_application_error("reporting.refund_availability_report", exc) from exc
+
     def stock_report(self, *, low_stock_threshold: int = 0) -> dict[str, Any]:
         try:
             return self.runtime.reporting.export_stock_report(low_stock_threshold=low_stock_threshold)

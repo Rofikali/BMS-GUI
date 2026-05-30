@@ -17,7 +17,8 @@ Start here. This folder has vision documents, architecture blueprints, and imple
 9. `IMPLEMENTATION_ROADMAP.md` - first build order
 10. `FIRST_TEST_PLAN.md` - first verification plan
 11. `RELEASE_GATE.md` - MVP-safe release checklist
-12. `BUSINESS_STRATEGY.md` - target customer and business model
+12. `RELEASE_CANDIDATE.md` - current release candidate notes
+13. `BUSINESS_STRATEGY.md` - target customer and business model
 
 ---
 
@@ -41,6 +42,7 @@ Start here. This folder has vision documents, architecture blueprints, and imple
 | `IMPLEMENTATION_ROADMAP.md` | build sequence |
 | `FIRST_TEST_PLAN.md` | first test sequence |
 | `RELEASE_GATE.md` | MVP-safe release checklist |
+| `RELEASE_CANDIDATE.md` | current release checkpoint and manual smoke |
 
 ---
 

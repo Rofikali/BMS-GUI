@@ -10,6 +10,8 @@ from bms.domain.reporting.models import (
     InvoiceReportRow,
     LedgerReport,
     LedgerReportRow,
+    RefundAvailabilityReport,
+    RefundAvailabilityReportRow,
     RefundReport,
     RefundReportRow,
     StockReport,
@@ -75,6 +77,30 @@ class RefundReportSchema(_ReportSchema):
 
     @classmethod
     def from_report(cls, report: RefundReport) -> RefundReportSchema:
+        return cls.model_validate(report)
+
+
+class RefundAvailabilityReportRowSchema(_ReportSchema):
+    invoice_id: str
+    period_id: str
+    item_id: str
+    description: str
+    currency: str
+    unit_price_minor: int = Field(ge=0)
+    original_quantity: int = Field(ge=0)
+    refunded_quantity: int = Field(ge=0)
+    remaining_quantity: int = Field(ge=0)
+    original_subtotal_minor: int = Field(ge=0)
+    refunded_subtotal_minor: int = Field(ge=0)
+    remaining_subtotal_minor: int = Field(ge=0)
+
+
+class RefundAvailabilityReportSchema(_ReportSchema):
+    period_id: str | None
+    rows: tuple[RefundAvailabilityReportRowSchema, ...]
+
+    @classmethod
+    def from_report(cls, report: RefundAvailabilityReport) -> RefundAvailabilityReportSchema:
         return cls.model_validate(report)
 
 

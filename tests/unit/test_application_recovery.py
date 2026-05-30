@@ -132,6 +132,24 @@ class ApplicationRecoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(ApplicationRecoveryError, "journal entry exists"):
                 recover_application_storage(root)
 
+    def test_inspect_application_recovery_reports_partial_refund_side_effects(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            store = initialize_data_root(root)
+            _append_partial_refund_wal_and_journal(store, transaction_id="txn_refund_partial")
+
+            diagnostics = inspect_application_recovery(root)
+
+            self.assertFalse(diagnostics.automatic_recovery_safe)
+            self.assertEqual(len(diagnostics.pending_transactions), 1)
+            transaction = diagnostics.pending_transactions[0]
+            self.assertEqual(transaction.transaction_id, "txn_refund_partial")
+            self.assertEqual(transaction.operation, "billing.create_refund")
+            self.assertEqual(transaction.correlation_id, "corr_txn_refund_partial")
+            self.assertEqual(transaction.side_effects, ("journal entry exists",))
+            with self.assertRaisesRegex(ApplicationRecoveryError, "journal entry exists"):
+                recover_application_storage(root)
+
     def test_reconcile_recovery_transaction_records_audit_event_and_resolves_allowed_decision(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -348,6 +366,39 @@ def _append_partial_invoice_wal_and_journal(store: object, *, transaction_id: st
             "currency": "INR",
         },
         record_id=f"jrn_jrn_INV-{transaction_id}",
+        created_at="2026-05-14T00:00:00Z",
+    )
+
+
+def _append_partial_refund_wal_and_journal(store: object, *, transaction_id: str) -> None:
+    store.core.append_wal_pending(
+        store.wal,
+        transaction_id,
+        "2026-05-14T00:00:00Z",
+        "usr_cashier",
+        f"corr_{transaction_id}",
+        {
+            "operation": "billing.create_refund",
+            "refund_id": f"REF-{transaction_id}",
+            "original_invoice_id": f"INV-{transaction_id}",
+            "journal_id": f"jrn_refund_REF-{transaction_id}",
+            "movement_ids": [f"mov_refund_REF-{transaction_id}_1"],
+        },
+    )
+    store.append_record(
+        store.journal_entries,
+        "accounting.journal_entry",
+        "usr_cashier",
+        f"corr_{transaction_id}",
+        f"journal_entry_jrn_refund_REF-{transaction_id}",
+        {
+            "journal_id": f"jrn_refund_REF-{transaction_id}",
+            "period_id": "FY2026-05",
+            "debit_total_minor": 59000,
+            "credit_total_minor": 59000,
+            "currency": "INR",
+        },
+        record_id=f"jrn_jrn_refund_REF-{transaction_id}",
         created_at="2026-05-14T00:00:00Z",
     )
 

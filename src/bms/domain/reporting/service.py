@@ -11,6 +11,8 @@ from bms.domain.reporting.models import (
     InvoiceReportRow,
     LedgerReport,
     LedgerReportRow,
+    RefundAvailabilityReport,
+    RefundAvailabilityReportRow,
     RefundReport,
     RefundReportRow,
     StockReport,
@@ -21,6 +23,7 @@ from bms.domain.reporting.models import (
 from bms.domain.reporting.schemas import (
     InvoiceReportSchema,
     LedgerReportSchema,
+    RefundAvailabilityReportSchema,
     RefundReportSchema,
     StockReportSchema,
     TaxReportSchema,
@@ -130,6 +133,89 @@ class ReportingService:
             ),
         )
 
+    def get_refund_availability_report(self, period_id: str | None = None) -> RefundAvailabilityReport:
+        invoice_periods: dict[str, str] = {}
+        for payload in self.store.read_payloads(self.store.invoices):
+            invoice_id = _str_payload(payload, "invoice_id")
+            invoice_periods[invoice_id] = _str_payload(payload, "period_id")
+
+        original_lines: dict[tuple[str, str, int], dict[str, object]] = {}
+        for payload in self.store.read_payloads(self.store.invoice_lines):
+            invoice_id = _str_payload(payload, "invoice_id")
+            invoice_period_id = invoice_periods.get(invoice_id)
+            if invoice_period_id is None:
+                raise ReportingError(f"invoice line references unknown invoice {invoice_id}")
+            if period_id is not None and invoice_period_id != period_id:
+                continue
+
+            item_id = _str_payload(payload, "item_id")
+            unit_price_minor = _int_payload(payload, "unit_price_minor")
+            key = (invoice_id, item_id, unit_price_minor)
+            line = original_lines.setdefault(
+                key,
+                {
+                    "invoice_id": invoice_id,
+                    "period_id": invoice_period_id,
+                    "item_id": item_id,
+                    "description": _text_payload(payload, "description"),
+                    "currency": _str_payload(payload, "currency"),
+                    "unit_price_minor": unit_price_minor,
+                    "quantity": 0,
+                },
+            )
+            line["quantity"] = int(line["quantity"]) + _int_payload(payload, "quantity")
+
+        refund_invoice_by_id = {
+            _str_payload(payload, "refund_id"): _str_payload(payload, "original_invoice_id")
+            for payload in self.store.read_payloads(self.store.refunds)
+        }
+        refunded_quantities: dict[tuple[str, str, int], int] = {}
+        for payload in self.store.read_payloads(self.store.refund_lines):
+            refund_id = _str_payload(payload, "refund_id")
+            original_invoice_id = refund_invoice_by_id.get(refund_id)
+            if original_invoice_id is None:
+                raise ReportingError(f"refund line references unknown refund {refund_id}")
+            invoice_period_id = invoice_periods.get(original_invoice_id)
+            if invoice_period_id is None:
+                raise ReportingError(f"refund {refund_id} references unknown invoice {original_invoice_id}")
+            if period_id is not None and invoice_period_id != period_id:
+                continue
+
+            key = (
+                original_invoice_id,
+                _str_payload(payload, "item_id"),
+                _int_payload(payload, "unit_price_minor"),
+            )
+            refunded_quantities[key] = refunded_quantities.get(key, 0) + _int_payload(payload, "quantity")
+
+        rows = []
+        for key, line in original_lines.items():
+            invoice_id, item_id, unit_price_minor = key
+            original_quantity = int(line["quantity"])
+            refunded_quantity = refunded_quantities.get(key, 0)
+            remaining_quantity = max(original_quantity - refunded_quantity, 0)
+            rows.append(
+                RefundAvailabilityReportRow(
+                    invoice_id=invoice_id,
+                    period_id=str(line["period_id"]),
+                    item_id=item_id,
+                    description=str(line["description"]),
+                    currency=str(line["currency"]),
+                    unit_price_minor=unit_price_minor,
+                    original_quantity=original_quantity,
+                    refunded_quantity=refunded_quantity,
+                    remaining_quantity=remaining_quantity,
+                    original_subtotal_minor=original_quantity * unit_price_minor,
+                    refunded_subtotal_minor=refunded_quantity * unit_price_minor,
+                    remaining_subtotal_minor=remaining_quantity * unit_price_minor,
+                )
+            )
+
+        return RefundAvailabilityReport(
+            period_id=period_id,
+            rows=tuple(sorted(rows, key=lambda row: (row.invoice_id, row.item_id, row.unit_price_minor))),
+        )
+
     def get_stock_report(self, *, low_stock_threshold: int = 0) -> StockReport:
         if low_stock_threshold < 0:
             raise ReportingError("low_stock_threshold cannot be negative")
@@ -200,6 +286,11 @@ class ReportingService:
     def export_refund_report(self, period_id: str | None = None) -> dict[str, Any]:
         return dump_report_schema(RefundReportSchema.from_report(self.get_refund_report(period_id)))
 
+    def export_refund_availability_report(self, period_id: str | None = None) -> dict[str, Any]:
+        return dump_report_schema(
+            RefundAvailabilityReportSchema.from_report(self.get_refund_availability_report(period_id))
+        )
+
     def export_stock_report(self, *, low_stock_threshold: int = 0) -> dict[str, Any]:
         return dump_report_schema(StockReportSchema.from_report(self.get_stock_report(low_stock_threshold=low_stock_threshold)))
 
@@ -217,6 +308,13 @@ def _str_payload(payload: dict[str, object], key: str) -> str:
     value = payload.get(key)
     if not isinstance(value, str) or not value:
         raise ReportingError(f"stored report payload field {key} is not a non-empty string")
+    return value
+
+
+def _text_payload(payload: dict[str, object], key: str) -> str:
+    value = payload.get(key)
+    if not isinstance(value, str):
+        raise ReportingError(f"stored report payload field {key} is not a string")
     return value
 
 

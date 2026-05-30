@@ -469,6 +469,8 @@ def _durable_side_effects_for_pending_operation(store: object, payload: dict[str
     operation = payload.get("operation")
     if operation == "billing.create_invoice":
         return _billing_invoice_side_effects(store, payload)
+    if operation == "billing.create_refund":
+        return _billing_refund_side_effects(store, payload)
     if operation == "accounting.post_journal":
         journal_id = payload.get("journal_id")
         if isinstance(journal_id, str):
@@ -506,6 +508,32 @@ def _billing_invoice_side_effects(store: object, payload: dict[str, object]) -> 
             (
                 (store.invoices, "invoice_id", invoice_id, "invoice exists"),
                 (store.invoice_lines, "invoice_id", invoice_id, "invoice lines exist"),
+            )
+        )
+    if isinstance(journal_id, str):
+        effects.extend(
+            (
+                (store.journal_entries, "journal_id", journal_id, "journal entry exists"),
+                (store.journal_lines, "journal_id", journal_id, "journal lines exist"),
+            )
+        )
+    if isinstance(movement_ids, list):
+        for movement_id in movement_ids:
+            if isinstance(movement_id, str):
+                effects.append((store.stock_movements, "movement_id", movement_id, "stock movement exists"))
+    return _record_effects(store, tuple(effects))
+
+
+def _billing_refund_side_effects(store: object, payload: dict[str, object]) -> list[str]:
+    effects: list[tuple[object, str, str, str]] = []
+    refund_id = payload.get("refund_id")
+    journal_id = payload.get("journal_id")
+    movement_ids = payload.get("movement_ids")
+    if isinstance(refund_id, str):
+        effects.extend(
+            (
+                (store.refunds, "refund_id", refund_id, "refund exists"),
+                (store.refund_lines, "refund_id", refund_id, "refund lines exist"),
             )
         )
     if isinstance(journal_id, str):

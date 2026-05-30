@@ -23,6 +23,7 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
 
             invoice_report = facade.invoice_report("FY2026-05")
             refund_report = facade.refund_report("FY2026-05")
+            refund_availability = facade.refund_availability_report("FY2026-05")
             stock_report = facade.stock_report(low_stock_threshold=3)
             ledger_report = facade.ledger_report("FY2026-05")
             tax_report = facade.tax_report("FY2026-05")
@@ -47,6 +48,8 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
             self.assertEqual(invoice_report["totals"][0]["total_minor"], 118000)
             self.assertEqual(refund_report["rows"][0]["refund_id"], "REF-FACADE-1")
             self.assertEqual(refund_report["totals"][0]["total_minor"], 59000)
+            self.assertEqual(refund_availability["rows"][0]["refunded_quantity"], 1)
+            self.assertEqual(refund_availability["rows"][0]["remaining_quantity"], 1)
             self.assertEqual(stock_report["rows"][0]["quantity_on_hand"], 4)
             self.assertEqual({row["account_code"] for row in ledger_report["rows"]}, {"1000", "2100", "4000"})
             self.assertEqual(tax_report["invoice_tax_collected_minor"], 18000)

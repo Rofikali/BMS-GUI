@@ -306,6 +306,8 @@ Need tests for:
 - journal posting
 - reversals
 - refunds
+- over-refund rejection
+- refund availability reports
 - GST calculations
 - trial balance
 - ledger consistency
@@ -778,6 +780,7 @@ Need:
 - realistic invoices
 - GST scenarios
 - refunds
+- partial and cumulative refund scenarios
 - inventory flows
 
 ---

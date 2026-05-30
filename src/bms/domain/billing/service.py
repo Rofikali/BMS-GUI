@@ -205,6 +205,7 @@ class BillingService:
             raise BillingError(f"period {command.period_id} is closed")
         if original_invoice.get("currency") != command.currency:
             raise BillingError("refund currency must match original invoice currency")
+        self._validate_refund_against_original_invoice(command)
 
         subtotal_minor = sum(line.quantity * line.unit_price_minor for line in command.lines)
         tax_minor = _calculate_tax(subtotal_minor, self.tax_rate_basis_points)
@@ -433,6 +434,48 @@ class BillingService:
                 return payload
         return None
 
+    def _validate_refund_against_original_invoice(self, command: CreateRefundCommand) -> None:
+        remaining_by_line = self._original_invoice_quantities(command.original_invoice_id)
+        if not remaining_by_line:
+            raise BillingError(f"original invoice {command.original_invoice_id} has no refundable lines")
+
+        prior_refund_ids = {
+            _required_str(payload, "refund_id")
+            for payload in self.store.read_payloads(self.store.refunds)
+            if payload.get("original_invoice_id") == command.original_invoice_id
+        }
+        for payload in self.store.read_payloads(self.store.refund_lines):
+            if payload.get("refund_id") not in prior_refund_ids:
+                continue
+            key = (_required_str(payload, "item_id"), _required_int(payload, "unit_price_minor"))
+            remaining_by_line[key] = remaining_by_line.get(key, 0) - _required_int(payload, "quantity")
+
+        requested_by_line: dict[tuple[str, int], int] = {}
+        for line in command.lines:
+            key = (line.item_id, line.unit_price_minor)
+            requested_by_line[key] = requested_by_line.get(key, 0) + line.quantity
+
+        for key, requested_quantity in requested_by_line.items():
+            remaining_quantity = remaining_by_line.get(key, 0)
+            item_id, unit_price_minor = key
+            if remaining_quantity <= 0:
+                raise BillingError(
+                    f"refund line {item_id} at unit price {unit_price_minor} is not available on original invoice"
+                )
+            if requested_quantity > remaining_quantity:
+                raise BillingError(
+                    f"refund quantity for item {item_id} at unit price {unit_price_minor} exceeds remaining refundable quantity"
+                )
+
+    def _original_invoice_quantities(self, invoice_id: str) -> dict[tuple[str, int], int]:
+        quantities: dict[tuple[str, int], int] = {}
+        for payload in self.store.read_payloads(self.store.invoice_lines):
+            if payload.get("invoice_id") != invoice_id:
+                continue
+            key = (_required_str(payload, "item_id"), _required_int(payload, "unit_price_minor"))
+            quantities[key] = quantities.get(key, 0) + _required_int(payload, "quantity")
+        return quantities
+
     def _validate_stock_available(self, command: CreateInvoiceCommand) -> None:
         required_by_item: dict[str, int] = {}
         for line in command.lines:
@@ -450,3 +493,17 @@ class BillingService:
 
 def _calculate_tax(subtotal_minor: int, tax_rate_basis_points: int) -> int:
     return subtotal_minor * tax_rate_basis_points // 10000
+
+
+def _required_str(payload: dict[str, object], key: str) -> str:
+    value = payload.get(key)
+    if not isinstance(value, str) or not value:
+        raise BillingError(f"stored billing payload field {key} is not a non-empty string")
+    return value
+
+
+def _required_int(payload: dict[str, object], key: str) -> int:
+    value = payload.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise BillingError(f"stored billing payload field {key} is not an integer")
+    return value

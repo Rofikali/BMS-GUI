@@ -220,7 +220,7 @@ inventory
 accounting
 analytics
 dashboard
-9.3 REFUND_PROCESSED
+9.3 REFUND_COMPLETED
 Purpose
 
 Refund completed.

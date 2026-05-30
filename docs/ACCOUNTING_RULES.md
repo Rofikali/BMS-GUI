@@ -545,7 +545,11 @@ Inventory Loss Expense Dr
 Refunds must:
 - reverse original revenue,
 - restore inventory if applicable,
-- preserve traceability.
+- preserve traceability,
+- reference the original invoice,
+- never exceed the remaining refundable quantity or value after prior refunds.
+
+Refund availability must be rebuildable from durable invoice lines and refund lines. Operators must be able to inspect original quantity, refunded quantity, and remaining refundable quantity before attempting another refund.
 
 ---
 

@@ -14,6 +14,8 @@ A build is MVP-safe only when it proves this lifecycle end to end:
 Register item
 -> Add opening stock
 -> Create invoice
+-> Create partial refund
+-> Validate remaining refundable quantity
 -> Validate stock
 -> Calculate tax
 -> Post journal
@@ -52,6 +54,11 @@ A release candidate is blocked if any of these fail:
 - unbalanced journals are accepted
 - invoices complete without journal impact
 - invoices complete without audit or business events
+- refunds complete without journal impact
+- refunds complete without audit or business events
+- refunds exceed the original invoice line quantity or value
+- partial refund failures with durable side effects are automatically rolled back
+- refund reports cannot show refunded and still-refundable quantities
 - inventory changes occur without stock movement records
 - stock can go negative when the policy disables it
 - duplicate invoice, journal, movement, or idempotency keys double-apply effects
@@ -72,11 +79,11 @@ A release candidate is blocked if any of these fail:
 | Native core | append, checksum, sequence, idempotency, snapshot, WAL inspect/recover |
 | Accounting | balanced journal, trial balance, ledger balances, closed-period guard |
 | Inventory | item registration, stock movement, stock rebuild, negative-stock guard |
-| Billing | invoice creates stock movement, journal, audit, event, and durable records |
+| Billing | invoice and refund create stock movement where applicable, journal, audit, event, and durable records |
 | Events | known business events validate against schemas before persistence |
-| Reporting | invoice, stock, ledger, tax, and trial balance reports rebuild from records |
+| Reporting | invoice, refund, refund availability, stock, ledger, tax, and trial balance reports rebuild from records |
 | Backup | backup manifest validates, restore validates, restored reports match source |
-| Runtime | startup health blocks recovery-required and protected storage |
+| Runtime | startup health blocks recovery-required and protected storage, including partial refund side effects |
 | Facade | raw payloads validate through app command boundary before service calls |
 | UI | app shell can run the core inventory, invoice, report, backup/restore flow |
 
@@ -95,7 +102,8 @@ Then complete this workflow:
 ```text
 Inventory tab: register item with opening stock
 Billing tab: create invoice for that item
-Reports tab: confirm invoice total, stock on hand, tax payable, and balanced trial balance
+Billing tab: create a partial refund for that invoice
+Reports tab: confirm invoice total, refund total, still-refundable quantity, stock on hand, tax payable, and balanced trial balance
 Backup tab: create backup
 Backup tab: validate restore into a clean target directory
 ```
@@ -123,7 +131,6 @@ A release candidate must not be tagged from a commit with failing CI.
 These items are still outside the current MVP-safe bar and must not be marketed as complete:
 
 - role-based permissions UI
-- refund completion workflow
 - P&L report completion
 - restore-over-live-data workflow
 - cloud sync

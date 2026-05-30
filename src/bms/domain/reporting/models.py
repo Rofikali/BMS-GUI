@@ -56,6 +56,28 @@ class RefundReport:
 
 
 @dataclass(frozen=True)
+class RefundAvailabilityReportRow:
+    invoice_id: str
+    period_id: str
+    item_id: str
+    description: str
+    currency: str
+    unit_price_minor: int
+    original_quantity: int
+    refunded_quantity: int
+    remaining_quantity: int
+    original_subtotal_minor: int
+    refunded_subtotal_minor: int
+    remaining_subtotal_minor: int
+
+
+@dataclass(frozen=True)
+class RefundAvailabilityReport:
+    period_id: str | None
+    rows: tuple[RefundAvailabilityReportRow, ...]
+
+
+@dataclass(frozen=True)
 class StockReportRow:
     item_id: str
     sku: str

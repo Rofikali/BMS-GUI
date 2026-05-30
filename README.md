@@ -69,6 +69,8 @@ Run the desktop app:
 uv run bms-gui
 ```
 
+Current MVP flow supports item registration, stock-in, invoice creation, partial refunds with over-refund protection, refund availability reporting, backup, restore validation, and startup/recovery checks.
+
 Inspect or recover storage when normal startup is blocked:
 
 ```bash

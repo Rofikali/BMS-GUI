@@ -68,6 +68,34 @@ Subscribers:
 - Reporting
 - Analytics
 
+## `billing.refund_completed.v1`
+
+Owner: Billing
+
+Class: business
+
+Payload:
+
+```json
+{
+  "refund_id": "REF-1001",
+  "original_invoice_id": "INV-1001",
+  "currency": "INR",
+  "subtotal_minor": 50000,
+  "tax_minor": 9000,
+  "total_minor": 59000,
+  "line_count": 1
+}
+```
+
+Subscribers:
+
+- Inventory
+- Accounting
+- Audit
+- Reporting
+- Analytics
+
 ## `inventory.stock_moved.v1`
 
 Owner: Inventory
@@ -150,4 +178,3 @@ Subscribers:
 - Removed or renamed fields require a new event version.
 - Subscribers must reject unknown major versions.
 - Critical events require fixture tests for every schema version.
-

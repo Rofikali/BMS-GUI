@@ -40,15 +40,14 @@ Forbidden:
 
 ```text
 Billing_CreateInvoice(request) -> InvoiceResult
-Billing_ProcessRefund(request) -> RefundResult
+Billing_CreateRefund(request) -> RefundResult
 Billing_GetInvoice(invoice_id) -> Invoice
 ```
 
 Publishes:
 
-- `billing.invoice_created.v1`
 - `billing.sale_completed.v1`
-- `billing.refund_processed.v1`
+- `billing.refund_completed.v1`
 
 ## Inventory
 

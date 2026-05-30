@@ -109,6 +109,8 @@ Dr Accounts Receivable
 
 Refunds must use reversal or explicit contra entries. Posted sale journals are never edited.
 
+Refunds must reference the original invoice and must not exceed the remaining refundable quantity or value after prior refunds. Refund availability must be rebuildable from append-only invoice and refund records.
+
 Cash refund:
 
 ```text
@@ -158,4 +160,3 @@ MVP reconciliation targets:
 - stock quantity vs inventory ledger
 - tax payable report vs tax ledger
 - receivables list vs AR control account
-

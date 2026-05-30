@@ -36,12 +36,14 @@ class ReportingServiceTests(unittest.TestCase):
 
             invoice_report = reports.get_invoice_report("FY2026-05")
             refund_report = reports.get_refund_report("FY2026-05")
+            refund_availability = reports.get_refund_availability_report("FY2026-05")
             stock_report = reports.get_stock_report(low_stock_threshold=3)
             ledger_report = reports.get_ledger_report("FY2026-05")
             tax_report = reports.get_tax_report("FY2026-05")
             trial_balance_report = reports.get_trial_balance_report("FY2026-05")
             invoice_export = reports.export_invoice_report("FY2026-05")
             refund_export = reports.export_refund_report("FY2026-05")
+            refund_availability_export = reports.export_refund_availability_report("FY2026-05")
             stock_export = reports.export_stock_report(low_stock_threshold=3)
             ledger_export = reports.export_ledger_report("FY2026-05")
             tax_export = reports.export_tax_report("FY2026-05")
@@ -62,6 +64,12 @@ class ReportingServiceTests(unittest.TestCase):
             self.assertEqual(refund_report.totals[0].currency, "INR")
             self.assertEqual(refund_report.totals[0].tax_minor, 9000)
             self.assertEqual(refund_report.totals[0].total_minor, 59000)
+            self.assertEqual(len(refund_availability.rows), 1)
+            self.assertEqual(refund_availability.rows[0].invoice_id, "INV-REPORT-1")
+            self.assertEqual(refund_availability.rows[0].original_quantity, 2)
+            self.assertEqual(refund_availability.rows[0].refunded_quantity, 1)
+            self.assertEqual(refund_availability.rows[0].remaining_quantity, 1)
+            self.assertEqual(refund_availability.rows[0].remaining_subtotal_minor, 50000)
             self.assertEqual(stock_report.rows[0].item_id, "ITEM-1")
             self.assertEqual(stock_report.rows[0].quantity_on_hand, 4)
             self.assertFalse(stock_report.rows[0].low_stock)
@@ -75,6 +83,7 @@ class ReportingServiceTests(unittest.TestCase):
             self.assertEqual(invoice_export["totals"][0]["total_minor"], 118000)
             self.assertEqual(refund_export["rows"][0]["refund_id"], "REF-REPORT-1")
             self.assertEqual(refund_export["totals"][0]["total_minor"], 59000)
+            self.assertEqual(refund_availability_export["rows"][0]["remaining_quantity"], 1)
             self.assertEqual(stock_export["rows"][0]["quantity_on_hand"], 4)
             self.assertEqual({row["account_code"] for row in ledger_export["rows"]}, {"1000", "2100", "4000"})
             self.assertEqual(tax_export["invoice_tax_collected_minor"], 18000)
@@ -114,6 +123,30 @@ class ReportingServiceTests(unittest.TestCase):
             self.assertTrue(
                 reports.get_trial_balance_report("FY2026-05").is_balanced
             )
+
+    def test_refund_availability_accepts_empty_invoice_line_description(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _store, billing, inventory, _accounting = _services(root)
+            _register_and_stock_item(inventory, quantity=5)
+            billing.create_invoice(
+                CreateInvoiceCommand(
+                    invoice_id="INV-EMPTY-DESC",
+                    customer_id="CUS-1",
+                    period_id="FY2026-05",
+                    timestamp="2026-05-14T02:00:00Z",
+                    actor_id="usr_cashier",
+                    correlation_id="corr_INV_EMPTY_DESC",
+                    payment_method="cash",
+                    currency="INR",
+                    lines=(InvoiceLineCommand("ITEM-1", 1, 50000, ""),),
+                )
+            )
+
+            report = ReportingService(initialize_data_root(root)).get_refund_availability_report("FY2026-05")
+
+            self.assertEqual(report.rows[0].description, "")
+            self.assertEqual(report.rows[0].remaining_quantity, 1)
 
     def test_stock_report_rejects_negative_low_stock_threshold(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

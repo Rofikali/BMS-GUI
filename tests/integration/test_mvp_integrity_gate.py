@@ -8,7 +8,14 @@ from bms.app import StartupHealthService, StartupState, start_command_facade
 from bms.app.bootstrap import initialize_data_root
 from bms.core import BMS_OK, BMS_WAL_RECOVERY_CLEAN
 from bms.domain.accounting import AccountingError, AccountingService, JournalLine, PostJournalCommand
-from bms.domain.billing import BillingError, BillingService, CreateInvoiceCommand, InvoiceLineCommand
+from bms.domain.billing import (
+    BillingError,
+    BillingService,
+    CreateInvoiceCommand,
+    CreateRefundCommand,
+    InvoiceLineCommand,
+    RefundLineCommand,
+)
 from bms.domain.inventory import InventoryService, Item
 from bms.domain.reporting import ReportingService
 from bms.services import BackupService
@@ -137,6 +144,56 @@ class MvpIntegrityGateTests(unittest.TestCase):
             self.assertEqual(restored.invoice_report("FY2026-05")["totals"][0]["total_minor"], 118000)
             self.assertEqual(restored.stock_report()["rows"][0]["quantity_on_hand"], 3)
 
+    def test_refund_lifecycle_survives_restart_backup_restore_and_over_refund_guard(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "live"
+            restore_root = Path(temp_dir) / "restored"
+            store, billing, inventory, accounting = _services(root)
+
+            inventory.register_item(
+                Item("ITEM-1", "SKU-1", "Test Item"),
+                actor_id="usr_inventory",
+                created_at="2026-05-14T00:00:00Z",
+                correlation_id="corr_item_ITEM-1",
+            )
+            inventory.adjust_stock(
+                movement_id="MOV-REFUND-GATE-IN",
+                item_id="ITEM-1",
+                quantity_delta=5,
+                timestamp="2026-05-14T00:05:00Z",
+                actor_id="usr_inventory",
+                reason="opening stock",
+                source_document_id="STK-1001",
+                correlation_id="corr_refund_gate_stock_in",
+            )
+            invoice = billing.create_invoice(_invoice())
+            refund = billing.create_refund(_refund("REF-1001", original_invoice_id=invoice.invoice_id, quantity=1))
+
+            self.assertEqual(refund.total_minor, 59000)
+            self.assertEqual(inventory.get_stock_on_hand("ITEM-1"), 4)
+            self.assertTrue(accounting.get_trial_balance("FY2026-05").is_balanced)
+
+            restarted_store, restarted_billing, restarted_inventory, _restarted_accounting = _services(root)
+            restarted_reports = ReportingService(restarted_store)
+
+            self.assertEqual(restarted_reports.get_invoice_report("FY2026-05").totals[0].total_minor, 118000)
+            self.assertEqual(restarted_reports.get_refund_report("FY2026-05").totals[0].total_minor, 59000)
+            self.assertEqual(restarted_reports.get_tax_report("FY2026-05").tax_payable_balance_minor, 9000)
+            self.assertEqual(restarted_inventory.get_stock_on_hand("ITEM-1"), 4)
+            with self.assertRaisesRegex(BillingError, "exceeds remaining refundable quantity"):
+                restarted_billing.create_refund(_refund("REF-OVER-RESTART", original_invoice_id=invoice.invoice_id, quantity=2))
+
+            backup = BackupService(restarted_store).create_backup(created_at="2026-05-14T05:00:00Z")
+            restore = BackupService.restore_backup(backup.backup_path, restore_root)
+            restored_store, restored_billing, restored_inventory, _restored_accounting = _services(restore_root)
+            restored_reports = ReportingService(restored_store)
+
+            self.assertEqual(restore.verified_record_counts, backup.verified_record_counts)
+            self.assertEqual(restored_reports.get_refund_report("FY2026-05").totals[0].total_minor, 59000)
+            self.assertEqual(restored_inventory.get_stock_on_hand("ITEM-1"), 4)
+            with self.assertRaisesRegex(BillingError, "exceeds remaining refundable quantity"):
+                restored_billing.create_refund(_refund("REF-OVER-RESTORED", original_invoice_id=invoice.invoice_id, quantity=2))
+
     def test_period_close_blocks_mutations_and_survives_backup_restore(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir) / "live"
@@ -220,6 +277,20 @@ def _invoice_with_id(invoice_id: str) -> CreateInvoiceCommand:
         payment_method="cash",
         currency="INR",
         lines=(InvoiceLineCommand("ITEM-1", 2, 50000, "Test Item"),),
+    )
+
+
+def _refund(refund_id: str, *, original_invoice_id: str, quantity: int) -> CreateRefundCommand:
+    return CreateRefundCommand(
+        refund_id=refund_id,
+        original_invoice_id=original_invoice_id,
+        period_id="FY2026-05",
+        timestamp="2026-05-14T03:00:00Z",
+        actor_id="usr_cashier",
+        correlation_id=f"corr_{refund_id}",
+        currency="INR",
+        reason="customer return",
+        lines=(RefundLineCommand("ITEM-1", quantity, 50000, "Test Item", restock=True),),
     )
 
 

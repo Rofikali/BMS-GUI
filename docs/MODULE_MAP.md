@@ -266,12 +266,11 @@ sales workflows
 tax integration
 APIs
 Billing_CreateInvoice()
-Billing_ProcessRefund()
+Billing_CreateRefund()
 Billing_GenerateReceipt()
 Emits Events
 SALE_COMPLETED
-INVOICE_CREATED
-REFUND_PROCESSED
+REFUND_COMPLETED
 Dependencies
 inventory
 accounting

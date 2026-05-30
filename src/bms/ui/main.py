@@ -226,10 +226,12 @@ def build_main_window_class():
             summary = qt.QFormLayout(summary_group)
             self.report_invoice_total_label = qt.QLabel("0")
             self.report_refund_total_label = qt.QLabel("0")
+            self.report_refundable_remaining_label = qt.QLabel("0")
             self.report_tax_payable_label = qt.QLabel("0")
             self.report_trial_balance_label = qt.QLabel("Unknown")
             summary.addRow("Invoice total", self.report_invoice_total_label)
             summary.addRow("Refund total", self.report_refund_total_label)
+            summary.addRow("Refundable remaining", self.report_refundable_remaining_label)
             summary.addRow("Tax payable", self.report_tax_payable_label)
             summary.addRow("Trial balance", self.report_trial_balance_label)
 
@@ -239,6 +241,9 @@ def build_main_window_class():
             self.refund_table = _table(
                 qt, ["Refund", "Invoice", "Reason", "Subtotal", "Tax", "Total"]
             )
+            self.refund_availability_table = _table(
+                qt, ["Invoice", "Item", "Unit price", "Sold", "Refunded", "Remaining"]
+            )
             self.ledger_table = _table(
                 qt, ["Account", "Name", "Debit", "Credit", "Balance"]
             )
@@ -246,7 +251,8 @@ def build_main_window_class():
             layout.addWidget(summary_group, 0, 0, 1, 2)
             layout.addWidget(self.invoice_table, 1, 0)
             layout.addWidget(self.refund_table, 1, 1)
-            layout.addWidget(self.ledger_table, 2, 0, 1, 2)
+            layout.addWidget(self.refund_availability_table, 2, 0, 1, 2)
+            layout.addWidget(self.ledger_table, 3, 0, 1, 2)
             return page
 
         def _build_backup_tab(self):
@@ -449,6 +455,7 @@ def build_main_window_class():
         def refresh_reports(self) -> None:
             invoice_report = self.facade.invoice_report("FY2026-05")
             refund_report = self.facade.refund_report("FY2026-05")
+            refund_availability = self.facade.refund_availability_report("FY2026-05")
             stock_report = self.facade.stock_report(low_stock_threshold=3)
             ledger_report = self.facade.ledger_report("FY2026-05")
             tax_report = self.facade.tax_report("FY2026-05")
@@ -460,8 +467,12 @@ def build_main_window_class():
             refund_total = sum(
                 total["total_minor"] for total in refund_report["totals"]
             )
+            refundable_remaining = sum(
+                row["remaining_subtotal_minor"] for row in refund_availability["rows"]
+            )
             self.report_invoice_total_label.setText(str(invoice_total))
             self.report_refund_total_label.setText(str(refund_total))
+            self.report_refundable_remaining_label.setText(str(refundable_remaining))
             self.report_tax_payable_label.setText(
                 str(tax_report["tax_payable_balance_minor"])
             )
@@ -510,6 +521,21 @@ def build_main_window_class():
                         str(row["total_minor"]),
                     ]
                     for row in refund_report["rows"]
+                ],
+            )
+            _set_rows(
+                qt,
+                self.refund_availability_table,
+                [
+                    [
+                        row["invoice_id"],
+                        row["item_id"],
+                        str(row["unit_price_minor"]),
+                        str(row["original_quantity"]),
+                        str(row["refunded_quantity"]),
+                        str(row["remaining_quantity"]),
+                    ]
+                    for row in refund_availability["rows"]
                 ],
             )
             _set_rows(

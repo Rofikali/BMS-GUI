@@ -11,6 +11,7 @@ Prove this lifecycle end to end:
 
 ```text
 Create Invoice
+-> Process Partial Refund
 -> Validate Stock
 -> Calculate Tax
 -> Post Journal Entry
@@ -27,13 +28,13 @@ If this lifecycle is correct, durable, auditable, and recoverable, the product h
 
 | Capability | Requirement |
 |---|---|
-| Billing | create invoice, payment status, refund skeleton |
+| Billing | create invoice, payment status, refund completion with over-refund guard |
 | Inventory | stock in/out, stock adjustment, low-stock flag |
 | Accounting | journal entries, ledgers, trial balance, basic P&L |
 | Tax | configurable GST/tax rate, tax payable tracking |
 | Audit | immutable action log with actor, timestamp, correlation id |
 | Users/Auth | admin, cashier, accountant roles |
-| Reporting | invoice list, stock report, ledger report, tax report |
+| Reporting | invoice list, refund report, refundable availability, stock report, ledger report, tax report |
 | File Storage | append logs, snapshots, WAL, manifest, checksums |
 | Backup | local backup/export and restore validation |
 | UI | fast desktop workflow for billing, inventory, reports |
@@ -60,6 +61,9 @@ If this lifecycle is correct, durable, auditable, and recoverable, the product h
 The MVP cannot ship unless:
 
 - every invoice creates accounting impact
+- every refund creates accounting impact and references an original invoice
+- refund quantity/value cannot exceed the original invoice after prior refunds
+- operators can see refunded and still-refundable quantities
 - every inventory mutation creates movement history
 - trial balance passes after test business flows
 - closed periods block edits

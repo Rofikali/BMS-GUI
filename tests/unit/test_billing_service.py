@@ -240,6 +240,54 @@ class BillingServiceTests(unittest.TestCase):
             self.assertEqual(inventory.get_stock_on_hand("ITEM-1"), 3)
             self.assertEqual(store.core.verify_file(store.stock_movements), 2)
 
+    def test_refund_accounting_failure_leaves_recovery_visible_parent_pending_without_refund_or_stock_return(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            store, setup_billing, inventory, _accounting = _services(root)
+            _register_and_stock_item(inventory, quantity=5)
+            setup_billing.create_invoice(_invoice("INV-REFUND-FAIL-ACCT", quantity=2, unit_price_minor=50000))
+            billing = BillingService(store, inventory, _FailingAccountingService(store))
+
+            with self.assertRaisesRegex(RuntimeError, "accounting unavailable"):
+                billing.create_refund(_refund("REF-FAIL-ACCT", original_invoice_id="INV-REFUND-FAIL-ACCT", quantity=1))
+
+            wal_payloads = store.read_payloads(store.wal)
+            parent_pending = [
+                payload
+                for payload in wal_payloads
+                if payload["state"] == "pending"
+                and payload["payload"].get("operation") == "billing.create_refund"
+                and payload["payload"].get("refund_id") == "REF-FAIL-ACCT"
+            ]
+            self.assertEqual(len(parent_pending), 1)
+            transaction_id = parent_pending[0]["transaction_id"]
+            self.assertFalse(
+                any(payload["state"] == "committed" and payload["transaction_id"] == transaction_id for payload in wal_payloads)
+            )
+            self.assertEqual(store.core.verify_file(store.refunds), 0)
+            self.assertEqual(store.core.verify_file(store.refund_lines), 0)
+            self.assertEqual(store.core.verify_file(store.journal_entries), 1)
+            self.assertEqual(inventory.get_stock_on_hand("ITEM-1"), 3)
+
+    def test_refund_inventory_failure_after_journal_blocks_automatic_recovery(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            store, setup_billing, setup_inventory, accounting = _services(root)
+            _register_and_stock_item(setup_inventory, quantity=5)
+            setup_billing.create_invoice(_invoice("INV-REFUND-FAIL-STOCK", quantity=2, unit_price_minor=50000))
+            billing = BillingService(store, _FailingInventoryService(store), accounting)
+
+            with self.assertRaisesRegex(RuntimeError, "inventory unavailable"):
+                billing.create_refund(_refund("REF-FAIL-STOCK", original_invoice_id="INV-REFUND-FAIL-STOCK", quantity=1))
+
+            self.assertEqual(store.core.verify_file(store.refunds), 0)
+            self.assertEqual(store.core.verify_file(store.refund_lines), 0)
+            self.assertEqual(store.core.verify_file(store.journal_entries), 2)
+            self.assertEqual(setup_inventory.get_stock_on_hand("ITEM-1"), 3)
+            self.assertTrue(accounting.get_trial_balance("FY2026-05").is_balanced)
+            with self.assertRaisesRegex(ApplicationRecoveryError, "durable side effects"):
+                recover_application_storage(root)
+
     def test_refund_unknown_invoice_is_rejected_before_side_effects(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             store, billing, _inventory, _accounting = _services(Path(temp_dir))
@@ -263,6 +311,59 @@ class BillingServiceTests(unittest.TestCase):
             self.assertEqual(store.core.verify_file(store.refunds), 1)
             self.assertEqual(store.core.verify_file(store.journal_entries), 2)
             self.assertEqual(inventory.get_stock_on_hand("ITEM-1"), 5)
+
+    def test_refund_quantity_cannot_exceed_original_invoice_quantity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store, billing, inventory, _accounting = _services(Path(temp_dir))
+            _register_and_stock_item(inventory, quantity=5)
+            billing.create_invoice(_invoice("INV-REFUND-OVER", quantity=2, unit_price_minor=50000))
+
+            with self.assertRaisesRegex(BillingError, "exceeds remaining refundable quantity"):
+                billing.create_refund(
+                    _refund("REF-OVER", original_invoice_id="INV-REFUND-OVER", quantity=3)
+                )
+
+            self.assertEqual(store.core.verify_file(store.refunds), 0)
+            self.assertEqual(store.core.verify_file(store.journal_entries), 1)
+            self.assertEqual(inventory.get_stock_on_hand("ITEM-1"), 3)
+
+    def test_cumulative_refunds_cannot_exceed_remaining_invoice_quantity(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store, billing, inventory, _accounting = _services(Path(temp_dir))
+            _register_and_stock_item(inventory, quantity=5)
+            billing.create_invoice(_invoice("INV-REFUND-CUMULATIVE", quantity=2, unit_price_minor=50000))
+            billing.create_refund(
+                _refund("REF-PARTIAL", original_invoice_id="INV-REFUND-CUMULATIVE", quantity=1)
+            )
+
+            with self.assertRaisesRegex(BillingError, "exceeds remaining refundable quantity"):
+                billing.create_refund(
+                    _refund("REF-CUMULATIVE-OVER", original_invoice_id="INV-REFUND-CUMULATIVE", quantity=2)
+                )
+
+            self.assertEqual(store.core.verify_file(store.refunds), 1)
+            self.assertEqual(store.core.verify_file(store.journal_entries), 2)
+            self.assertEqual(inventory.get_stock_on_hand("ITEM-1"), 4)
+
+    def test_refund_line_must_match_original_invoice_item_and_unit_price(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store, billing, inventory, _accounting = _services(Path(temp_dir))
+            _register_and_stock_item(inventory, quantity=5)
+            billing.create_invoice(_invoice("INV-REFUND-WRONG-PRICE", quantity=2, unit_price_minor=50000))
+
+            with self.assertRaisesRegex(BillingError, "not available on original invoice"):
+                billing.create_refund(
+                    _refund(
+                        "REF-WRONG-PRICE",
+                        original_invoice_id="INV-REFUND-WRONG-PRICE",
+                        quantity=1,
+                        unit_price_minor=60000,
+                    )
+                )
+
+            self.assertEqual(store.core.verify_file(store.refunds), 0)
+            self.assertEqual(store.core.verify_file(store.journal_entries), 1)
+            self.assertEqual(inventory.get_stock_on_hand("ITEM-1"), 3)
 
     def test_closed_period_blocks_refund_before_side_effects(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -340,7 +441,14 @@ def _invoice(invoice_id: str, *, quantity: int, unit_price_minor: int) -> Create
     )
 
 
-def _refund(refund_id: str, *, original_invoice_id: str, restock: bool = True) -> CreateRefundCommand:
+def _refund(
+    refund_id: str,
+    *,
+    original_invoice_id: str,
+    quantity: int = 2,
+    unit_price_minor: int = 50000,
+    restock: bool = True,
+) -> CreateRefundCommand:
     return CreateRefundCommand(
         refund_id=refund_id,
         original_invoice_id=original_invoice_id,
@@ -350,7 +458,7 @@ def _refund(refund_id: str, *, original_invoice_id: str, restock: bool = True) -
         correlation_id=f"corr_{refund_id}",
         currency="INR",
         reason="customer return",
-        lines=(RefundLineCommand("ITEM-1", 2, 50000, "Test Item", restock=restock),),
+        lines=(RefundLineCommand("ITEM-1", quantity, unit_price_minor, "Test Item", restock=restock),),
     )
 
 

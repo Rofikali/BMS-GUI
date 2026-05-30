@@ -53,7 +53,9 @@ data/
   billing/
     invoices.jsonl
     invoice_lines.jsonl
-    refunds.jsonl
+    refunds/
+      refunds.jsonl
+      refund_lines.jsonl
     snapshots/
       invoice_index.json
   audit/
@@ -81,7 +83,7 @@ Append-only files are the source of truth:
 | accounting journals | `accounting/journal_entries.jsonl`, `accounting/journal_lines.jsonl` |
 | stock history | `inventory/stock_movements.jsonl` |
 | invoices | `billing/invoices.jsonl`, `billing/invoice_lines.jsonl` |
-| refunds | `billing/refunds.jsonl` |
+| refunds | `billing/refunds/refunds.jsonl`, `billing/refunds/refund_lines.jsonl` |
 | audit | `audit/audit_records.jsonl` |
 | durable events | `events/business_events.jsonl` |
 
@@ -172,6 +174,7 @@ Required append-only record types:
 - `billing.invoice`
 - `billing.invoice_line`
 - `billing.refund`
+- `billing.refund_line`
 - `inventory.stock_movement`
 - `accounting.journal_entry`
 - `accounting.journal_line`
