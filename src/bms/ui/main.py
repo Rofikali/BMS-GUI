@@ -257,6 +257,12 @@ def build_main_window_class():
             )
             summary.addRow("Tax payable", self.report_tax_payable_label)
             summary.addRow("Trial balance", self.report_trial_balance_label)
+            self.close_period_button = qt.QPushButton("Close Period")
+            self.close_period_button.setIcon(
+                self.style().standardIcon(qt.QStyle.StandardPixmap.SP_DialogApplyButton)
+            )
+            self.close_period_button.clicked.connect(self.close_period)
+            summary.addRow(self.close_period_button)
 
             self.invoice_table = _table(
                 qt, ["Invoice", "Customer", "Subtotal", "Tax", "Total"]
@@ -506,6 +512,23 @@ def build_main_window_class():
             except Exception as exc:
                 self._show_error(exc)
 
+        def close_period(self) -> None:
+            try:
+                period_id = self._current_period_id()
+                self.facade.close_period(
+                    {
+                        "period_id": period_id,
+                        "actor_id": self._required_actor_id(),
+                        "closed_at": _timestamp(),
+                        "correlation_id": f"corr_close_{period_id}",
+                    }
+                )
+                self._set_status(f"Closed period {period_id}")
+                self._sync_action_states()
+                self.refresh_reports()
+            except Exception as exc:
+                self._show_error(exc)
+
         def _connect_action_state_inputs(self) -> None:
             for widget in (
                 self.item_id_input,
@@ -565,6 +588,13 @@ def build_main_window_class():
                 (
                     self.backup_button,
                     (("Operator", self._current_actor_id()),),
+                ),
+                (
+                    self.close_period_button,
+                    (
+                        ("Operator", self._current_actor_id()),
+                        ("Period", self.period_input.text()),
+                    ),
                 ),
                 (
                     self.restore_button,

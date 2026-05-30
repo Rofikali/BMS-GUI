@@ -67,6 +67,7 @@ class UiMainTests(unittest.TestCase):
 
         window.create_invoice()
         window.create_refund()
+        window.close_period()
         window.refresh_reports()
 
         self.assertEqual(facade.created_invoice["period_id"], "FY2026-06")
@@ -75,8 +76,11 @@ class UiMainTests(unittest.TestCase):
         self.assertEqual(facade.created_refund["period_id"], "FY2026-06")
         self.assertEqual(facade.created_refund["currency"], "USD")
         self.assertEqual(facade.created_refund["reason"], "damaged box")
+        self.assertEqual(facade.closed_period["period_id"], "FY2026-06")
+        self.assertEqual(facade.closed_period["actor_id"], "usr_admin")
         self.assertEqual(facade.tax_report_calls[-1], ("FY2026-06", "USD"))
         self.assertEqual(window.currency_input.text(), "USD")
+        self.assertEqual(window.status_label.text(), "Closed period FY2026-06")
         window.close()
         app.processEvents()
 
@@ -151,6 +155,7 @@ class UiMainTests(unittest.TestCase):
         self.assertTrue(window.create_invoice_button.isEnabled())
         self.assertTrue(window.create_refund_button.isEnabled())
         self.assertTrue(window.backup_button.isEnabled())
+        self.assertTrue(window.close_period_button.isEnabled())
         self.assertFalse(window.restore_button.isEnabled())
         self.assertIn("Backup path", window.restore_button.toolTip())
         self.assertIn("Restore target", window.restore_button.toolTip())
@@ -165,6 +170,13 @@ class UiMainTests(unittest.TestCase):
 
         self.assertTrue(window.create_invoice_button.isEnabled())
         self.assertEqual(window.create_invoice_button.toolTip(), "")
+
+        window.period_input.clear()
+
+        self.assertFalse(window.create_invoice_button.isEnabled())
+        self.assertFalse(window.create_refund_button.isEnabled())
+        self.assertFalse(window.close_period_button.isEnabled())
+        self.assertIn("Period", window.close_period_button.toolTip())
         window.close()
         app.processEvents()
 
@@ -184,6 +196,7 @@ class UiMainTests(unittest.TestCase):
         self.assertFalse(window.create_invoice_button.isEnabled())
         self.assertFalse(window.create_refund_button.isEnabled())
         self.assertFalse(window.backup_button.isEnabled())
+        self.assertFalse(window.close_period_button.isEnabled())
         self.assertIn("Operator", window.backup_button.toolTip())
         window.close()
         app.processEvents()
@@ -200,6 +213,7 @@ class _CapturingFacade:
     ) -> None:
         self.created_invoice: dict[str, object] = {}
         self.created_refund: dict[str, object] = {}
+        self.closed_period: dict[str, object] = {}
         self.tax_report_calls: list[tuple[str, str]] = []
         self.actor_session_rows = actor_sessions
         self.invoice_rows = invoice_rows or []
@@ -233,6 +247,14 @@ class _CapturingFacade:
             "subtotal_minor": 50000,
             "tax_minor": 9000,
             "total_minor": 59000,
+        }
+
+    def close_period(self, payload):
+        self.closed_period = dict(payload)
+        return {
+            "period_id": payload["period_id"],
+            "status": "closed",
+            "actor_id": payload["actor_id"],
         }
 
     def invoice_report(self, period_id):

@@ -27,6 +27,27 @@ The automated gate proves:
 
 ---
 
+# Release Gate Evidence
+
+| Gate | Status | Automated proof |
+|---|---|---|
+| Register item and opening stock | Proven | `tests/integration/test_mvp_integrity_gate.py`, `tests/unit/test_inventory_service.py` |
+| Invoice creates stock, journal, audit, and business event impact | Proven | `tests/integration/test_mvp_integrity_gate.py`, `tests/unit/test_billing_service.py` |
+| Partial refund references original invoice and posts accounting impact | Proven | `tests/integration/test_mvp_integrity_gate.py`, `tests/unit/test_billing_service.py` |
+| Refund quantity/value cannot exceed remaining refundable amount | Proven | `tests/integration/test_mvp_integrity_gate.py`, `tests/unit/test_billing_service.py` |
+| Reports rebuild after restart and restore | Proven | `tests/integration/test_mvp_integrity_gate.py`, `tests/unit/test_reporting_service.py` |
+| Closed periods block invoice and journal mutations at service and facade boundaries | Proven | `tests/integration/test_mvp_integrity_gate.py`, `tests/unit/test_accounting_service.py`, `tests/unit/test_application_command_facade.py` |
+| Role permissions are enforced at the facade boundary | Proven | `tests/unit/test_application_command_facade.py` |
+| UI/facade workflow uses command validation and operator guardrails | Proven | `tests/unit/test_ui_main.py`, `tests/unit/test_application_command_facade.py` |
+| Append-only checksums and WAL recovery rules are tested | Proven | `tests/core/test_bms_core_storage.c`, `tests/unit/test_core_file_store.py`, `tests/unit/test_application_recovery.py` |
+| Protected-mode storage blocks normal startup | Proven | `tests/unit/test_startup_health_service.py`, `tests/unit/test_application_command_facade.py` |
+| Backup restore validates counts and restored business state | Proven | `tests/integration/test_mvp_integrity_gate.py`, `tests/unit/test_backup_service.py` |
+| Manual desktop smoke on native host | Required before tag | Run the checklist below with `uv run bms-gui` |
+
+The current release-blocking gap is manual, not architectural: a human must still run the native desktop smoke on a machine with Qt libraries and compare the visible reports to the expected lifecycle results.
+
+---
+
 # Required Gate
 
 Before tagging this candidate, run:
@@ -48,19 +69,33 @@ The gate must pass with:
 On a desktop host with Qt native libraries installed:
 
 ```bash
-uv run bms-gui
+BMS_DATA_ROOT=/tmp/bms-gui-smoke-data uv run bms-gui
 ```
 
 Complete this workflow:
 
 ```text
-Inventory tab: register ITEM-1 with opening stock
-Billing tab: create invoice INV-1001
-Billing tab: create partial refund REF-1001
-Reports tab: confirm invoice total, refund total, refundable remaining, stock, tax, and trial balance
+Inventory tab: register the generated default item with opening stock
+Billing tab: create an invoice for the registered item
+Billing tab: create a partial refund for that invoice
+Reports tab: confirm invoice total, refund total, still-refundable quantity, stock, tax, and balanced trial balance
+Reports tab: close the accounting period
+Billing tab: confirm a new invoice for that closed period is blocked
 Backup tab: create backup
 Backup tab: validate restore into a clean target directory
 ```
+
+Expected visible results after the invoice and one-unit refund:
+
+| Check | Expected value |
+|---|---|
+| Invoice total | `118000` |
+| Refund total | `59000` |
+| Refundable remaining | `50000` |
+| Stock on hand | `4` |
+| Tax payable | `9000` |
+| Trial balance | `Balanced` |
+| Closed-period invoice attempt | blocked with a closed-period error |
 
 Any crash, silent failure, or report mismatch blocks release.
 

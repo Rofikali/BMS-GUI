@@ -36,6 +36,13 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
                     "restore_root": str(Path(temp_dir) / "restored"),
                 }
             )
+            restored = start_command_facade(Path(temp_dir) / "restored")
+            restored_invoice_report = restored.invoice_report("FY2026-05")
+            restored_refund_report = restored.refund_report("FY2026-05")
+            restored_availability = restored.refund_availability_report("FY2026-05")
+            restored_stock_report = restored.stock_report(low_stock_threshold=3)
+            restored_tax_report = restored.tax_report("FY2026-05")
+            restored_trial_balance = restored.trial_balance_report("FY2026-05")
 
             self.assertEqual(item["item_id"], "ITEM-1")
             self.assertEqual(stock_in["quantity_on_hand"], 5)
@@ -58,6 +65,12 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
             self.assertEqual(backup["verified_record_counts"]["invoices"], 1)
             self.assertEqual(backup["verified_record_counts"]["refunds"], 1)
             self.assertEqual(restore["verified_record_counts"], backup["verified_record_counts"])
+            self.assertEqual(restored_invoice_report["totals"][0]["total_minor"], 118000)
+            self.assertEqual(restored_refund_report["totals"][0]["total_minor"], 59000)
+            self.assertEqual(restored_availability["rows"][0]["remaining_quantity"], 1)
+            self.assertEqual(restored_stock_report["rows"][0]["quantity_on_hand"], 4)
+            self.assertEqual(restored_tax_report["tax_payable_balance_minor"], 9000)
+            self.assertTrue(restored_trial_balance["is_balanced"])
 
     def test_facade_maps_restore_non_empty_target_to_business_error(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -207,6 +220,40 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
             self.assertEqual(context.exception.operation, "accounting.post_journal")
             self.assertIsInstance(context.exception.__cause__, AccountingError)
 
+    def test_facade_closes_period_and_blocks_later_financial_mutations(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            facade = start_command_facade(Path(temp_dir))
+            facade.register_item(_register_item_payload())
+            facade.commit_stock_movement(_stock_movement_payload("MOV-CLOSE-FACADE-IN", 5, "adjustment"))
+            facade.create_invoice(_invoice_payload())
+
+            closed = facade.close_period(_close_period_payload())
+            blocked_invoice = _invoice_payload()
+            blocked_invoice["invoice_id"] = "INV-FACADE-CLOSED"
+            blocked_invoice["correlation_id"] = "corr_INV_FACADE_CLOSED"
+
+            self.assertEqual(closed["period_id"], "FY2026-05")
+            self.assertEqual(closed["status"], "closed")
+            self.assertEqual(closed["actor_id"], "usr_accountant")
+            with self.assertRaises(ApplicationCommandError) as context:
+                facade.create_invoice(blocked_invoice)
+
+            self.assertEqual(context.exception.code, ApplicationErrorCode.BUSINESS_RULE)
+            self.assertEqual(context.exception.operation, "billing.create_invoice")
+            self.assertIsInstance(context.exception.__cause__, BillingError)
+
+    def test_facade_rejects_unauthorized_period_close_before_service_call(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            facade = start_command_facade(Path(temp_dir))
+            payload = _close_period_payload()
+            payload["actor_id"] = "usr_cashier"
+
+            with self.assertRaises(ApplicationCommandError) as context:
+                facade.close_period(payload)
+
+            self.assertEqual(context.exception.code, ApplicationErrorCode.UNAUTHORIZED)
+            self.assertEqual(context.exception.operation, "accounting.close_period")
+
     def test_facade_maps_insufficient_stock_to_business_error(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             facade = start_command_facade(Path(temp_dir))
@@ -250,6 +297,15 @@ def _backup_payload() -> dict[str, object]:
     return {
         "actor_id": "usr_admin",
         "created_at": "2026-05-14T03:00:00Z",
+    }
+
+
+def _close_period_payload() -> dict[str, object]:
+    return {
+        "period_id": "FY2026-05",
+        "actor_id": "usr_accountant",
+        "closed_at": "2026-05-14T04:00:00Z",
+        "correlation_id": "corr_close_FY2026_05",
     }
 
 

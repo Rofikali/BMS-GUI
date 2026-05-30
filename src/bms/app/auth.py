@@ -134,6 +134,7 @@ class AuthorizationPolicy:
         "inventory.register_item": frozenset({ApplicationRole.ADMIN}),
         "inventory.commit_stock_movement": frozenset({ApplicationRole.ADMIN}),
         "accounting.post_journal": frozenset({ApplicationRole.ACCOUNTANT}),
+        "accounting.close_period": frozenset({ApplicationRole.ACCOUNTANT}),
         "billing.create_invoice": frozenset({ApplicationRole.CASHIER}),
         "billing.create_refund": frozenset({ApplicationRole.CASHIER}),
         "backup.create": frozenset({ApplicationRole.ADMIN}),

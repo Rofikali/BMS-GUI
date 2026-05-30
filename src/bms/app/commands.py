@@ -40,6 +40,22 @@ class BackupCommandPayloadSchema(BaseModel):
         return value
 
 
+class ClosePeriodCommandPayloadSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    period_id: NonEmptyStr
+    actor_id: NonEmptyStr
+    closed_at: StrictStr | None = None
+    correlation_id: StrictStr | None = None
+
+    @field_validator("closed_at", "correlation_id")
+    @classmethod
+    def _optional_strings_cannot_be_empty(cls, value: str | None) -> str | None:
+        if value is not None and not value:
+            raise ValueError("optional string fields cannot be empty")
+        return value
+
+
 class RestoreCommandPayloadSchema(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -92,6 +108,14 @@ class JournalOutputSchema(_FacadeOutputSchema):
     debit_total_minor: int = Field(ge=0)
     credit_total_minor: int = Field(ge=0)
     currency: str
+
+
+class ClosePeriodOutputSchema(_FacadeOutputSchema):
+    period_id: str
+    status: str
+    actor_id: str
+    closed_at: str | None = None
+    correlation_id: str | None = None
 
 
 class BackupOutputSchema(_FacadeOutputSchema):
@@ -167,6 +191,26 @@ class ApplicationCommandFacade:
             return JournalOutputSchema.model_validate(result).model_dump(mode="json")
         except Exception as exc:
             raise map_application_error("accounting.post_journal", exc) from exc
+
+    def close_period(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            self._authorize("accounting.close_period", payload)
+            request = ClosePeriodCommandPayloadSchema.model_validate(payload)
+            self.runtime.accounting.close_period(
+                request.period_id,
+                actor_id=request.actor_id,
+                closed_at=request.closed_at,
+                correlation_id=request.correlation_id,
+            )
+            return ClosePeriodOutputSchema(
+                period_id=request.period_id,
+                status="closed",
+                actor_id=request.actor_id,
+                closed_at=request.closed_at,
+                correlation_id=request.correlation_id,
+            ).model_dump(mode="json")
+        except Exception as exc:
+            raise map_application_error("accounting.close_period", exc) from exc
 
     def create_invoice(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         try:
