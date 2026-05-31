@@ -201,12 +201,54 @@ class UiMainTests(unittest.TestCase):
         window.close()
         app.processEvents()
 
+    def test_main_window_user_role_selection_and_update_flow(self) -> None:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            qt = ui_main._import_qt()
+        except SystemExit as exc:
+            self.skipTest(str(exc))
+
+        app = qt.QApplication.instance() or qt.QApplication([])
+        facade = _CapturingFacade(
+            user_role_rows=[
+                {
+                    "actor_id": "usr_cashier",
+                    "display_name": "Cashier",
+                    "roles": ["cashier"],
+                    "active": True,
+                }
+            ]
+        )
+        window = ui_main.create_main_window(facade=facade)
+
+        self.assertEqual(window.users_table.rowCount(), 1)
+        window.users_table.setCurrentCell(0, 0)
+
+        self.assertEqual(window.user_actor_id_input.text(), "usr_cashier")
+        self.assertTrue(window.user_cashier_input.isChecked())
+        self.assertFalse(window.user_accountant_input.isChecked())
+        self.assertTrue(window.update_user_roles_button.isEnabled())
+
+        window.user_accountant_input.setChecked(True)
+        window.update_user_roles()
+
+        self.assertEqual(facade.updated_user_roles["actor_id"], "usr_admin")
+        self.assertEqual(facade.updated_user_roles["target_actor_id"], "usr_cashier")
+        self.assertEqual(
+            facade.updated_user_roles["roles"], ["cashier", "accountant"]
+        )
+        self.assertTrue(facade.updated_user_roles["active"])
+        self.assertEqual(window.status_label.text(), "Updated roles for usr_cashier")
+        window.close()
+        app.processEvents()
+
 
 class _CapturingFacade:
     def __init__(
         self,
         *,
         actor_sessions: list[dict[str, object]] | None = None,
+        user_role_rows: list[dict[str, object]] | None = None,
         invoice_rows: list[dict[str, object]] | None = None,
         refund_availability_rows: list[dict[str, object]] | None = None,
         stock_rows: list[dict[str, object]] | None = None,
@@ -214,8 +256,10 @@ class _CapturingFacade:
         self.created_invoice: dict[str, object] = {}
         self.created_refund: dict[str, object] = {}
         self.closed_period: dict[str, object] = {}
+        self.updated_user_roles: dict[str, object] = {}
         self.tax_report_calls: list[tuple[str, str]] = []
         self.actor_session_rows = actor_sessions
+        self.user_role_rows = user_role_rows
         self.invoice_rows = invoice_rows or []
         self.refund_availability_rows = refund_availability_rows or []
         self.stock_rows = stock_rows or []
@@ -230,6 +274,27 @@ class _CapturingFacade:
                 "roles": ["admin"],
             }
         ]
+
+    def user_roles(self, payload):
+        if self.user_role_rows is not None:
+            return self.user_role_rows
+        return [
+            {
+                "actor_id": "usr_admin",
+                "display_name": "Admin",
+                "roles": ["admin"],
+                "active": True,
+            }
+        ]
+
+    def update_user_roles(self, payload):
+        self.updated_user_roles = dict(payload)
+        return {
+            "actor_id": payload["target_actor_id"],
+            "display_name": "Updated User",
+            "roles": payload["roles"],
+            "active": payload["active"],
+        }
 
     def create_invoice(self, payload):
         self.created_invoice = dict(payload)

@@ -20,6 +20,7 @@ The automated gate proves:
 - audit records and business events for billing, inventory, accounting, and recovery
 - restart-safe invoice, refund, stock, ledger, tax, trial balance, and availability reports
 - closed-period mutation guards
+- admin role-management UI with last-active-admin protection
 - backup creation and restore validation
 - startup health, WAL inspection, protected mode, and recovery diagnostics
 - partial invoice/refund failure detection when durable side effects exist
@@ -38,6 +39,7 @@ The automated gate proves:
 | Reports rebuild after restart and restore | Proven | `tests/integration/test_mvp_integrity_gate.py`, `tests/unit/test_reporting_service.py` |
 | Closed periods block invoice and journal mutations at service and facade boundaries | Proven | `tests/integration/test_mvp_integrity_gate.py`, `tests/unit/test_accounting_service.py`, `tests/unit/test_application_command_facade.py` |
 | Role permissions are enforced at the facade boundary | Proven | `tests/unit/test_application_command_facade.py` |
+| Role-management UI updates existing user roles without allowing admin lockout | Proven | `tests/unit/test_ui_main.py`, `tests/unit/test_application_command_facade.py` |
 | UI/facade workflow uses command validation and operator guardrails | Proven | `tests/unit/test_ui_main.py`, `tests/unit/test_application_command_facade.py` |
 | Append-only checksums and WAL recovery rules are tested | Proven | `tests/core/test_bms_core_storage.c`, `tests/unit/test_core_file_store.py`, `tests/unit/test_application_recovery.py` |
 | Protected-mode storage blocks normal startup | Proven | `tests/unit/test_startup_health_service.py`, `tests/unit/test_application_command_facade.py` |
@@ -116,7 +118,6 @@ Any crash, silent failure, or report mismatch blocks release.
 
 # Explicitly Not Supported Yet
 
-- role-management UI
 - P&L report completion
 - restore-over-live-data workflow
 - cloud sync

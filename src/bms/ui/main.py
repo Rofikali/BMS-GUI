@@ -92,6 +92,7 @@ def build_main_window_class():
             tabs.addTab(self._build_inventory_tab(), "Inventory")
             tabs.addTab(self._build_billing_tab(), "Billing")
             tabs.addTab(self._build_reports_tab(), "Reports")
+            tabs.addTab(self._build_users_tab(), "Users")
             tabs.addTab(self._build_backup_tab(), "Backup")
             self.setCentralWidget(tabs)
 
@@ -106,6 +107,7 @@ def build_main_window_class():
             self._connect_action_state_inputs()
             self._sync_action_states()
             self.refresh_reports()
+            self.refresh_users()
 
         def _build_inventory_tab(self):
             page = qt.QWidget()
@@ -332,6 +334,48 @@ def build_main_window_class():
             layout.addWidget(restore_group)
             return page
 
+        def _build_users_tab(self):
+            page = qt.QWidget()
+            layout = qt.QGridLayout(page)
+            layout.setColumnStretch(1, 1)
+
+            editor_group = qt.QGroupBox("Role Assignment")
+            editor = qt.QFormLayout(editor_group)
+            self.user_actor_id_input = qt.QLineEdit()
+            self.user_actor_id_input.setReadOnly(True)
+            self.user_display_name_label = qt.QLabel("No user selected")
+            self.user_admin_input = qt.QCheckBox("Admin")
+            self.user_cashier_input = qt.QCheckBox("Cashier")
+            self.user_accountant_input = qt.QCheckBox("Accountant")
+            self.user_active_input = qt.QCheckBox()
+            self.user_active_input.setChecked(True)
+            editor.addRow("Actor ID", self.user_actor_id_input)
+            editor.addRow("Name", self.user_display_name_label)
+            editor.addRow("Admin", self.user_admin_input)
+            editor.addRow("Cashier", self.user_cashier_input)
+            editor.addRow("Accountant", self.user_accountant_input)
+            editor.addRow("Active", self.user_active_input)
+
+            user_actions = qt.QHBoxLayout()
+            self.update_user_roles_button = qt.QPushButton("Apply Roles")
+            self.update_user_roles_button.setIcon(
+                self.style().standardIcon(qt.QStyle.StandardPixmap.SP_DialogApplyButton)
+            )
+            self.update_user_roles_button.clicked.connect(self.update_user_roles)
+            user_actions.addWidget(self.update_user_roles_button)
+            user_actions.addStretch(1)
+            editor.addRow(user_actions)
+
+            users_group = qt.QGroupBox("Users")
+            users_layout = qt.QVBoxLayout(users_group)
+            self.users_table = _table(qt, ["Actor", "Name", "Roles", "Active"])
+            self.users_table.itemSelectionChanged.connect(self._apply_user_selection)
+            users_layout.addWidget(self.users_table)
+
+            layout.addWidget(editor_group, 0, 0)
+            layout.addWidget(users_group, 0, 1)
+            return page
+
         def register_item(self) -> None:
             try:
                 item_id = self._required_text("Item ID", self.item_id_input)
@@ -535,6 +579,29 @@ def build_main_window_class():
             except Exception as exc:
                 self._show_error(exc)
 
+        def update_user_roles(self) -> None:
+            try:
+                target_actor_id = self._required_text(
+                    "User", self.user_actor_id_input
+                )
+                roles = self._selected_user_roles()
+                self.facade.update_user_roles(
+                    {
+                        "actor_id": self._required_actor_id(),
+                        "target_actor_id": target_actor_id,
+                        "roles": roles,
+                        "active": self.user_active_input.isChecked(),
+                        "updated_at": _timestamp(),
+                        "correlation_id": f"corr_roles_{target_actor_id}",
+                    }
+                )
+                self._set_status(f"Updated roles for {target_actor_id}")
+                self.refresh_users()
+                self._reload_actor_selector()
+                self._sync_action_states()
+            except Exception as exc:
+                self._show_error(exc)
+
         def _connect_action_state_inputs(self) -> None:
             for widget in (
                 self.item_id_input,
@@ -551,9 +618,17 @@ def build_main_window_class():
                 self.currency_input,
                 self.restore_backup_path_input,
                 self.restore_target_input,
+                self.user_actor_id_input,
             ):
                 widget.textChanged.connect(self._sync_action_states)
             self.actor_selector.currentIndexChanged.connect(self._sync_action_states)
+            for widget in (
+                self.user_admin_input,
+                self.user_cashier_input,
+                self.user_accountant_input,
+                self.user_active_input,
+            ):
+                widget.stateChanged.connect(self._sync_action_states)
 
         def _sync_action_states(self, *_args) -> None:
             action_requirements = (
@@ -608,6 +683,14 @@ def build_main_window_class():
                         ("Operator", self._current_actor_id()),
                         ("Backup path", self.restore_backup_path_input.text()),
                         ("Restore target", self.restore_target_input.text()),
+                    ),
+                ),
+                (
+                    self.update_user_roles_button,
+                    (
+                        ("Operator", self._current_actor_id()),
+                        ("User", self.user_actor_id_input.text()),
+                        ("Role", ", ".join(self._selected_user_roles())),
                     ),
                 ),
             )
@@ -723,11 +806,46 @@ def build_main_window_class():
                 ],
             )
 
+        def refresh_users(self) -> None:
+            actor_id = self._current_actor_id()
+            if not actor_id:
+                _set_rows(qt, self.users_table, [])
+                return
+            rows = self.facade.user_roles({"actor_id": actor_id})
+            _set_rows(
+                qt,
+                self.users_table,
+                [
+                    [
+                        row["actor_id"],
+                        row["display_name"],
+                        ", ".join(row["roles"]),
+                        "Yes" if row["active"] else "No",
+                    ]
+                    for row in rows
+                ],
+            )
+
         def _refresh_reports_from_input(self) -> None:
             try:
                 self.refresh_reports()
             except Exception as exc:
                 self._show_error(exc)
+
+        def _reload_actor_selector(self) -> None:
+            current_actor_id = self._current_actor_id()
+            self.actor_selector.clear()
+            for session in self.facade.actor_sessions():
+                roles = ", ".join(session["roles"])
+                self.actor_selector.addItem(
+                    f"{session['display_name']} ({roles})", session["actor_id"]
+                )
+            if self.actor_selector.count() == 0:
+                self.actor_selector.addItem("No active operator", "")
+            else:
+                index = self.actor_selector.findData(current_actor_id)
+                if index >= 0:
+                    self.actor_selector.setCurrentIndex(index)
 
         def _current_actor_id(self) -> str:
             return str(self.actor_selector.currentData() or "")
@@ -775,6 +893,26 @@ def build_main_window_class():
             if remaining.isdigit():
                 self.refund_quantity_input.setValue(max(int(remaining), 1))
 
+        def _apply_user_selection(self) -> None:
+            selected_row = self.users_table.currentRow()
+            if selected_row < 0:
+                return
+            actor_id = _table_text(self.users_table, selected_row, 0)
+            display_name = _table_text(self.users_table, selected_row, 1)
+            roles = {
+                role.strip()
+                for role in _table_text(self.users_table, selected_row, 2).split(",")
+                if role.strip()
+            }
+            active = _table_text(self.users_table, selected_row, 3)
+            self.user_actor_id_input.setText(actor_id)
+            self.user_display_name_label.setText(display_name or "No user selected")
+            self.user_admin_input.setChecked("admin" in roles)
+            self.user_cashier_input.setChecked("cashier" in roles)
+            self.user_accountant_input.setChecked("accountant" in roles)
+            self.user_active_input.setChecked(active == "Yes")
+            self._sync_action_states()
+
         def _current_period_id(self) -> str:
             return self._required_text("Period", self.period_input)
 
@@ -788,6 +926,16 @@ def build_main_window_class():
             if not value:
                 raise ValueError(f"{label} is required")
             return value
+
+        def _selected_user_roles(self) -> list[str]:
+            roles: list[str] = []
+            if self.user_admin_input.isChecked():
+                roles.append("admin")
+            if self.user_cashier_input.isChecked():
+                roles.append("cashier")
+            if self.user_accountant_input.isChecked():
+                roles.append("accountant")
+            return roles
 
         def _set_status(self, message: str) -> None:
             self.status_label.setText(message)

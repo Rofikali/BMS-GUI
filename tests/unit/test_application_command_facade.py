@@ -103,6 +103,82 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
             self.assertEqual(sessions["usr_cashier"], ["cashier"])
             self.assertEqual(sessions["usr_accountant"], ["accountant"])
 
+    def test_facade_lists_and_updates_user_roles_from_admin_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            facade = start_command_facade(Path(temp_dir))
+
+            initial_roles = {
+                row["actor_id"]: row for row in facade.user_roles({"actor_id": "usr_admin"})
+            }
+            updated = facade.update_user_roles(
+                {
+                    "actor_id": "usr_admin",
+                    "target_actor_id": "usr_cashier",
+                    "roles": ["cashier", "accountant"],
+                    "active": True,
+                    "updated_at": "2026-05-14T04:30:00Z",
+                    "correlation_id": "corr_roles_usr_cashier",
+                }
+            )
+            reloaded = start_command_facade(Path(temp_dir))
+            sessions = {
+                session["actor_id"]: session["roles"]
+                for session in reloaded.actor_sessions()
+            }
+
+            self.assertEqual(initial_roles["usr_cashier"]["roles"], ["cashier"])
+            self.assertEqual(updated["actor_id"], "usr_cashier")
+            self.assertEqual(updated["roles"], ["cashier", "accountant"])
+            self.assertEqual(sessions["usr_cashier"], ["cashier", "accountant"])
+
+    def test_facade_rejects_unauthorized_user_role_update(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            facade = start_command_facade(Path(temp_dir))
+
+            with self.assertRaises(ApplicationCommandError) as context:
+                facade.update_user_roles(
+                    {
+                        "actor_id": "usr_cashier",
+                        "target_actor_id": "usr_accountant",
+                        "roles": ["admin"],
+                        "active": True,
+                        "updated_at": "2026-05-14T04:30:00Z",
+                        "correlation_id": "corr_roles_blocked",
+                    }
+                )
+
+            self.assertEqual(context.exception.code, ApplicationErrorCode.UNAUTHORIZED)
+            self.assertEqual(context.exception.operation, "auth.update_user_roles")
+
+    def test_facade_rejects_removing_last_active_admin(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            facade = start_command_facade(Path(temp_dir))
+            facade.update_user_roles(
+                {
+                    "actor_id": "usr_admin",
+                    "target_actor_id": "usr_inventory",
+                    "roles": ["cashier"],
+                    "active": False,
+                    "updated_at": "2026-05-14T04:25:00Z",
+                    "correlation_id": "corr_roles_inventory_no_admin",
+                }
+            )
+
+            with self.assertRaises(ApplicationCommandError) as context:
+                facade.update_user_roles(
+                    {
+                        "actor_id": "usr_admin",
+                        "target_actor_id": "usr_admin",
+                        "roles": ["cashier"],
+                        "active": True,
+                        "updated_at": "2026-05-14T04:30:00Z",
+                        "correlation_id": "corr_roles_no_admin",
+                    }
+                )
+
+            self.assertEqual(context.exception.code, ApplicationErrorCode.UNAUTHORIZED)
+            self.assertEqual(context.exception.operation, "auth.update_user_roles")
+
     def test_facade_authorizes_from_roles_file_not_payload_claims(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

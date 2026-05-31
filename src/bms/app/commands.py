@@ -5,7 +5,7 @@ from typing import Annotated, Any, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
 
-from bms.app.auth import AuthorizationPolicy, validate_actor_payload
+from bms.app.auth import ApplicationRole, AuthorizationPolicy, validate_actor_payload
 from bms.app.errors import map_application_error
 from bms.app.runtime import ApplicationRuntime, start_application
 from bms.domain.accounting import validate_post_journal_command_payload
@@ -37,6 +37,32 @@ class BackupCommandPayloadSchema(BaseModel):
     def _optional_strings_cannot_be_empty(cls, value: str | None) -> str | None:
         if value is not None and not value:
             raise ValueError("optional string fields cannot be empty")
+        return value
+
+
+class ListUserRolesPayloadSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    actor_id: NonEmptyStr
+
+
+class UpdateUserRolesPayloadSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    actor_id: NonEmptyStr
+    target_actor_id: NonEmptyStr
+    roles: tuple[ApplicationRole, ...]
+    active: bool = True
+    updated_at: NonEmptyStr
+    correlation_id: NonEmptyStr
+
+    @field_validator("roles")
+    @classmethod
+    def _roles_must_be_present(cls, value: tuple[ApplicationRole, ...]) -> tuple[ApplicationRole, ...]:
+        if not value:
+            raise ValueError("at least one role is required")
+        if len(set(value)) != len(value):
+            raise ValueError("actor roles must be unique")
         return value
 
 
@@ -118,6 +144,13 @@ class ClosePeriodOutputSchema(_FacadeOutputSchema):
     correlation_id: str | None = None
 
 
+class UserRoleOutputSchema(_FacadeOutputSchema):
+    actor_id: str
+    display_name: str
+    active: bool
+    roles: tuple[str, ...]
+
+
 class BackupOutputSchema(_FacadeOutputSchema):
     backup_path: str
     created_at: str
@@ -147,6 +180,43 @@ class ApplicationCommandFacade:
             ]
         except Exception as exc:
             raise map_application_error("auth.actor_sessions", exc) from exc
+
+    def user_roles(self, payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+        try:
+            ListUserRolesPayloadSchema.model_validate(payload)
+            self._authorize("auth.list_user_roles", payload)
+            return [
+                UserRoleOutputSchema(
+                    actor_id=profile.actor_id,
+                    display_name=profile.display_name,
+                    active=profile.active,
+                    roles=tuple(role.value for role in profile.roles),
+                ).model_dump(mode="json")
+                for profile in self.runtime.identity.list_user_roles()
+            ]
+        except Exception as exc:
+            raise map_application_error("auth.list_user_roles", exc) from exc
+
+    def update_user_roles(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            request = UpdateUserRolesPayloadSchema.model_validate(payload)
+            self._authorize("auth.update_user_roles", payload)
+            profile = self.runtime.identity.update_user_roles(
+                request.target_actor_id,
+                request.roles,
+                active=request.active,
+                updated_by=request.actor_id,
+                updated_at=request.updated_at,
+                correlation_id=request.correlation_id,
+            )
+            return UserRoleOutputSchema(
+                actor_id=profile.actor_id,
+                display_name=profile.display_name,
+                active=profile.active,
+                roles=tuple(role.value for role in profile.roles),
+            ).model_dump(mode="json")
+        except Exception as exc:
+            raise map_application_error("auth.update_user_roles", exc) from exc
 
     def _authorize(self, operation: str, payload: Mapping[str, Any]) -> None:
         actor = validate_actor_payload(payload)

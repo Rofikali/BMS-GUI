@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import Annotated, Iterable
+from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
 
@@ -27,6 +29,14 @@ class AuthorizationError(Exception):
 class ActorSession:
     actor_id: str
     display_name: str
+    roles: tuple[ApplicationRole, ...]
+
+
+@dataclass(frozen=True)
+class UserRoleProfile:
+    actor_id: str
+    display_name: str
+    active: bool
     roles: tuple[ApplicationRole, ...]
 
 
@@ -128,6 +138,77 @@ class IdentityService:
                 sessions.append(ActorSession(user.actor_id, user.display_name, actor_roles))
         return tuple(sessions)
 
+    def list_user_roles(self) -> tuple[UserRoleProfile, ...]:
+        users = UsersFileSchema.model_validate_json(self.store.users.read_text(encoding="utf-8"))
+        roles = RolesFileSchema.model_validate_json(self.store.roles.read_text(encoding="utf-8"))
+        role_by_actor_id = {assignment.actor_id: assignment.roles for assignment in roles.assignments}
+        return tuple(
+            UserRoleProfile(
+                actor_id=user.actor_id,
+                display_name=user.display_name,
+                active=user.active,
+                roles=role_by_actor_id.get(user.actor_id, ()),
+            )
+            for user in users.users
+        )
+
+    def update_user_roles(
+        self,
+        actor_id: str,
+        roles: Iterable[ApplicationRole],
+        *,
+        active: bool,
+        updated_by: str,
+        updated_at: str,
+        correlation_id: str,
+    ) -> UserRoleProfile:
+        users = UsersFileSchema.model_validate_json(self.store.users.read_text(encoding="utf-8"))
+        roles_file = RolesFileSchema.model_validate_json(self.store.roles.read_text(encoding="utf-8"))
+        requested_roles = tuple(dict.fromkeys(roles))
+        if not requested_roles:
+            raise AuthorizationError("at least one role is required")
+
+        user_by_actor_id = {user.actor_id: user for user in users.users}
+        target_user = user_by_actor_id.get(actor_id)
+        if target_user is None:
+            raise AuthorizationError(f"unknown user: {actor_id}")
+
+        updated_users = tuple(
+            UserRecordSchema(
+                actor_id=user.actor_id,
+                display_name=user.display_name,
+                active=active if user.actor_id == actor_id else user.active,
+            )
+            for user in users.users
+        )
+        updated_assignments = _replace_role_assignment(
+            roles_file.assignments,
+            RoleAssignmentSchema(actor_id=actor_id, roles=requested_roles),
+        )
+        _ensure_active_admin_remains(updated_users, updated_assignments)
+
+        _write_json_model(self.store.users, UsersFileSchema(users=updated_users))
+        _write_json_model(self.store.roles, RolesFileSchema(assignments=updated_assignments))
+        self.store.append_audit_record(
+            "auth.roles_updated",
+            updated_by,
+            "user",
+            actor_id,
+            correlation_id,
+            occurred_at=updated_at,
+            details={
+                "active": active,
+                "roles": [role.value for role in requested_roles],
+            },
+            idempotency_key=f"auth_roles_updated_{actor_id}_{uuid4().hex}",
+        )
+        return UserRoleProfile(
+            actor_id=actor_id,
+            display_name=target_user.display_name,
+            active=active,
+            roles=requested_roles,
+        )
+
 
 class AuthorizationPolicy:
     _required_roles: dict[str, frozenset[ApplicationRole]] = {
@@ -139,6 +220,8 @@ class AuthorizationPolicy:
         "billing.create_refund": frozenset({ApplicationRole.CASHIER}),
         "backup.create": frozenset({ApplicationRole.ADMIN}),
         "backup.restore": frozenset({ApplicationRole.ADMIN}),
+        "auth.list_user_roles": frozenset({ApplicationRole.ADMIN}),
+        "auth.update_user_roles": frozenset({ApplicationRole.ADMIN}),
         "recovery.reconcile": frozenset({ApplicationRole.ADMIN}),
     }
 
@@ -177,3 +260,44 @@ def default_identity_documents() -> tuple[str, str]:
 
 def validate_actor_payload(payload: object) -> ActorPayloadSchema:
     return ActorPayloadSchema.model_validate(payload)
+
+
+def _replace_role_assignment(
+    assignments: tuple[RoleAssignmentSchema, ...],
+    replacement: RoleAssignmentSchema,
+) -> tuple[RoleAssignmentSchema, ...]:
+    found = False
+    updated: list[RoleAssignmentSchema] = []
+    for assignment in assignments:
+        if assignment.actor_id == replacement.actor_id:
+            found = True
+            updated.append(replacement)
+        else:
+            updated.append(assignment)
+    if not found:
+        updated.append(replacement)
+    return tuple(updated)
+
+
+def _ensure_active_admin_remains(
+    users: tuple[UserRecordSchema, ...],
+    assignments: tuple[RoleAssignmentSchema, ...],
+) -> None:
+    active_actor_ids = {user.actor_id for user in users if user.active}
+    active_admins = [
+        assignment.actor_id
+        for assignment in assignments
+        if assignment.actor_id in active_actor_ids
+        and ApplicationRole.ADMIN in assignment.roles
+    ]
+    if not active_admins:
+        raise AuthorizationError("at least one active admin must remain")
+
+
+def _write_json_model(path: Path, model: BaseModel) -> None:
+    temp_path = path.with_suffix(path.suffix + f".{uuid4().hex}.tmp")
+    temp_path.write_text(
+        json.dumps(model.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    temp_path.replace(path)
