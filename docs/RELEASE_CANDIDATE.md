@@ -72,6 +72,19 @@ On a desktop host with Qt native libraries installed:
 BMS_DATA_ROOT=/tmp/bms-gui-smoke-data uv run bms-gui
 ```
 
+Headless environments such as Codespaces usually cannot run the interactive
+desktop smoke because Qt has no display server. A failure like `could not
+connect to display` or `Could not load the Qt platform plugin "xcb"` means the
+manual smoke must be run on a real desktop host. In that environment, run the
+offscreen UI smoke as a partial check:
+
+```bash
+QT_QPA_PLATFORM=offscreen BMS_DATA_ROOT=/tmp/bms-gui-smoke-data uv run python -m unittest tests.unit.test_ui_main
+```
+
+The offscreen smoke does not replace the manual desktop smoke before tagging a
+human-facing release candidate.
+
 Complete this workflow:
 
 ```text

@@ -84,7 +84,9 @@ def build_main_window_class():
             self.period_input.editingFinished.connect(self._refresh_reports_from_input)
             self.currency_input = qt.QLineEdit("INR")
             self.currency_input.setMaximumWidth(70)
-            self.currency_input.editingFinished.connect(self._refresh_reports_from_input)
+            self.currency_input.editingFinished.connect(
+                self._refresh_reports_from_input
+            )
 
             tabs = qt.QTabWidget()
             tabs.addTab(self._build_inventory_tab(), "Inventory")
@@ -113,7 +115,9 @@ def build_main_window_class():
             form_group = qt.QGroupBox("Item Setup")
             form = qt.QFormLayout(form_group)
             self.item_id_input = qt.QLineEdit(self._initial_item_id)
-            self.sku_input = qt.QLineEdit(self._initial_item_id.replace("ITEM", "SKU", 1))
+            self.sku_input = qt.QLineEdit(
+                self._initial_item_id.replace("ITEM", "SKU", 1)
+            )
             self.item_name_input = qt.QLineEdit("New Item")
             self.opening_stock_input = _spin_box(qt, 0, 1_000_000, 5)
             form.addRow("Item ID", self.item_id_input)
@@ -267,7 +271,9 @@ def build_main_window_class():
             self.invoice_table = _table(
                 qt, ["Invoice", "Customer", "Subtotal", "Tax", "Total"]
             )
-            self.invoice_table.itemSelectionChanged.connect(self._apply_invoice_selection)
+            self.invoice_table.itemSelectionChanged.connect(
+                self._apply_invoice_selection
+            )
             self.refund_table = _table(
                 qt, ["Refund", "Invoice", "Reason", "Subtotal", "Tax", "Total"]
             )
