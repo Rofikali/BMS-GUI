@@ -11,6 +11,7 @@ from bms.domain.reporting.models import (
     InvoiceReportRow,
     LedgerReport,
     LedgerReportRow,
+    ProfitAndLossReport,
     RefundAvailabilityReport,
     RefundAvailabilityReportRow,
     RefundReport,
@@ -23,6 +24,7 @@ from bms.domain.reporting.models import (
 from bms.domain.reporting.schemas import (
     InvoiceReportSchema,
     LedgerReportSchema,
+    ProfitAndLossReportSchema,
     RefundAvailabilityReportSchema,
     RefundReportSchema,
     StockReportSchema,
@@ -255,6 +257,38 @@ class ReportingService:
         ]
         return LedgerReport(period_id=period_id, rows=tuple(rows))
 
+    def get_profit_and_loss_report(
+        self,
+        period_id: str,
+        *,
+        currency: str = "INR",
+    ) -> ProfitAndLossReport:
+        balances = AccountingService(self.store).get_ledger_balances(period_id)
+        revenue_minor = 0
+        contra_revenue_minor = 0
+        expense_minor = 0
+        for balance in balances.values():
+            if balance.currency != currency:
+                continue
+            if balance.account_type.value == "revenue":
+                revenue_minor += balance.credit_total_minor
+                contra_revenue_minor += balance.debit_total_minor
+            elif balance.account_type.value == "expense":
+                expense_minor += max(
+                    balance.debit_total_minor - balance.credit_total_minor,
+                    0,
+                )
+        net_revenue_minor = revenue_minor - contra_revenue_minor
+        return ProfitAndLossReport(
+            period_id=period_id,
+            currency=currency,
+            revenue_minor=revenue_minor,
+            contra_revenue_minor=contra_revenue_minor,
+            net_revenue_minor=net_revenue_minor,
+            expense_minor=expense_minor,
+            net_income_minor=net_revenue_minor - expense_minor,
+        )
+
     def get_tax_report(self, period_id: str, *, currency: str = "INR") -> TaxReport:
         invoice_report = self.get_invoice_report(period_id)
         invoice_tax_collected_minor = sum(total.tax_minor for total in invoice_report.totals if total.currency == currency)
@@ -296,6 +330,13 @@ class ReportingService:
 
     def export_ledger_report(self, period_id: str) -> dict[str, Any]:
         return dump_report_schema(LedgerReportSchema.from_report(self.get_ledger_report(period_id)))
+
+    def export_profit_and_loss_report(self, period_id: str, *, currency: str = "INR") -> dict[str, Any]:
+        return dump_report_schema(
+            ProfitAndLossReportSchema.from_report(
+                self.get_profit_and_loss_report(period_id, currency=currency)
+            )
+        )
 
     def export_tax_report(self, period_id: str, *, currency: str = "INR") -> dict[str, Any]:
         return dump_report_schema(TaxReportSchema.from_report(self.get_tax_report(period_id, currency=currency)))

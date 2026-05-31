@@ -330,6 +330,20 @@ class ApplicationCommandFacade:
         except Exception as exc:
             raise map_application_error("reporting.ledger_report", exc) from exc
 
+    def profit_and_loss_report(
+        self,
+        period_id: str,
+        *,
+        currency: str = "INR",
+    ) -> dict[str, Any]:
+        try:
+            return self.runtime.reporting.export_profit_and_loss_report(
+                period_id,
+                currency=currency,
+            )
+        except Exception as exc:
+            raise map_application_error("reporting.profit_and_loss_report", exc) from exc
+
     def tax_report(self, period_id: str, *, currency: str = "INR") -> dict[str, Any]:
         try:
             return self.runtime.reporting.export_tax_report(period_id, currency=currency)

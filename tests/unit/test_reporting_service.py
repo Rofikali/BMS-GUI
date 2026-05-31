@@ -39,6 +39,7 @@ class ReportingServiceTests(unittest.TestCase):
             refund_availability = reports.get_refund_availability_report("FY2026-05")
             stock_report = reports.get_stock_report(low_stock_threshold=3)
             ledger_report = reports.get_ledger_report("FY2026-05")
+            profit_and_loss_report = reports.get_profit_and_loss_report("FY2026-05")
             tax_report = reports.get_tax_report("FY2026-05")
             trial_balance_report = reports.get_trial_balance_report("FY2026-05")
             invoice_export = reports.export_invoice_report("FY2026-05")
@@ -46,6 +47,7 @@ class ReportingServiceTests(unittest.TestCase):
             refund_availability_export = reports.export_refund_availability_report("FY2026-05")
             stock_export = reports.export_stock_report(low_stock_threshold=3)
             ledger_export = reports.export_ledger_report("FY2026-05")
+            profit_and_loss_export = reports.export_profit_and_loss_report("FY2026-05")
             tax_export = reports.export_tax_report("FY2026-05")
             trial_balance_export = reports.export_trial_balance_report("FY2026-05")
 
@@ -77,6 +79,11 @@ class ReportingServiceTests(unittest.TestCase):
                 {row.account_code for row in ledger_report.rows},
                 {"1000", "2100", "4000"},
             )
+            self.assertEqual(profit_and_loss_report.revenue_minor, 100000)
+            self.assertEqual(profit_and_loss_report.contra_revenue_minor, 50000)
+            self.assertEqual(profit_and_loss_report.net_revenue_minor, 50000)
+            self.assertEqual(profit_and_loss_report.expense_minor, 0)
+            self.assertEqual(profit_and_loss_report.net_income_minor, 50000)
             self.assertEqual(tax_report.invoice_tax_collected_minor, 18000)
             self.assertEqual(tax_report.tax_payable_balance_minor, 9000)
             self.assertTrue(trial_balance_report.is_balanced)
@@ -86,6 +93,7 @@ class ReportingServiceTests(unittest.TestCase):
             self.assertEqual(refund_availability_export["rows"][0]["remaining_quantity"], 1)
             self.assertEqual(stock_export["rows"][0]["quantity_on_hand"], 4)
             self.assertEqual({row["account_code"] for row in ledger_export["rows"]}, {"1000", "2100", "4000"})
+            self.assertEqual(profit_and_loss_export["net_income_minor"], 50000)
             self.assertEqual(tax_export["invoice_tax_collected_minor"], 18000)
             self.assertTrue(trial_balance_export["is_balanced"])
 

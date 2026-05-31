@@ -256,6 +256,9 @@ def build_main_window_class():
             self.report_refundable_remaining_label = qt.QLabel("0")
             self.report_tax_payable_label = qt.QLabel("0")
             self.report_trial_balance_label = qt.QLabel("Unknown")
+            self.report_net_revenue_label = qt.QLabel("0")
+            self.report_expense_label = qt.QLabel("0")
+            self.report_net_income_label = qt.QLabel("0")
             summary.addRow("Invoice total", self.report_invoice_total_label)
             summary.addRow("Refund total", self.report_refund_total_label)
             summary.addRow(
@@ -263,6 +266,9 @@ def build_main_window_class():
             )
             summary.addRow("Tax payable", self.report_tax_payable_label)
             summary.addRow("Trial balance", self.report_trial_balance_label)
+            summary.addRow("Net revenue", self.report_net_revenue_label)
+            summary.addRow("Expense", self.report_expense_label)
+            summary.addRow("Net income", self.report_net_income_label)
             self.close_period_button = qt.QPushButton("Close Period")
             self.close_period_button.setIcon(
                 self.style().standardIcon(qt.QStyle.StandardPixmap.SP_DialogApplyButton)
@@ -711,6 +717,10 @@ def build_main_window_class():
             refund_availability = self.facade.refund_availability_report(period_id)
             stock_report = self.facade.stock_report(low_stock_threshold=3)
             ledger_report = self.facade.ledger_report(period_id)
+            profit_and_loss = self.facade.profit_and_loss_report(
+                period_id,
+                currency=currency,
+            )
             tax_report = self.facade.tax_report(period_id, currency=currency)
             trial_balance = self.facade.trial_balance_report(period_id)
 
@@ -731,6 +741,13 @@ def build_main_window_class():
             )
             self.report_trial_balance_label.setText(
                 "Balanced" if trial_balance["is_balanced"] else "Unbalanced"
+            )
+            self.report_net_revenue_label.setText(
+                str(profit_and_loss["net_revenue_minor"])
+            )
+            self.report_expense_label.setText(str(profit_and_loss["expense_minor"]))
+            self.report_net_income_label.setText(
+                str(profit_and_loss["net_income_minor"])
             )
 
             _set_rows(
