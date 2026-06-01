@@ -17,6 +17,7 @@ The automated gate proves:
 - partial refund creation with optional stock return
 - refund quantity/value guard against the original invoice and prior refunds
 - refund availability reporting from durable invoice and refund lines
+- P&L summary reporting from durable ledger balances
 - audit records and business events for billing, inventory, accounting, and recovery
 - restart-safe invoice, refund, stock, ledger, tax, trial balance, and availability reports
 - closed-period mutation guards
@@ -37,6 +38,7 @@ The automated gate proves:
 | Partial refund references original invoice and posts accounting impact | Proven | `tests/integration/test_mvp_integrity_gate.py`, `tests/unit/test_billing_service.py` |
 | Refund quantity/value cannot exceed remaining refundable amount | Proven | `tests/integration/test_mvp_integrity_gate.py`, `tests/unit/test_billing_service.py` |
 | Reports rebuild after restart and restore | Proven | `tests/integration/test_mvp_integrity_gate.py`, `tests/unit/test_reporting_service.py` |
+| P&L report derives revenue, returns, expenses, and net income from ledger balances | Proven | `tests/unit/test_reporting_service.py`, `tests/unit/test_application_command_facade.py`, `tests/unit/test_ui_main.py` |
 | Closed periods block invoice and journal mutations at service and facade boundaries | Proven | `tests/integration/test_mvp_integrity_gate.py`, `tests/unit/test_accounting_service.py`, `tests/unit/test_application_command_facade.py` |
 | Role permissions are enforced at the facade boundary | Proven | `tests/unit/test_application_command_facade.py` |
 | Role-management UI updates existing user roles without allowing admin lockout | Proven | `tests/unit/test_ui_main.py`, `tests/unit/test_application_command_facade.py` |
@@ -118,7 +120,6 @@ Any crash, silent failure, or report mismatch blocks release.
 
 # Explicitly Not Supported Yet
 
-- P&L report completion
 - restore-over-live-data workflow
 - cloud sync
 - database storage

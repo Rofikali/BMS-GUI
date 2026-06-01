@@ -69,7 +69,7 @@ Run the desktop app:
 uv run bms-gui
 ```
 
-Current MVP flow supports item registration, stock-in, invoice creation, partial refunds with over-refund protection, refund availability reporting, accounting period close with closed-period mutation guards, admin role management with lockout protection, backup, restore validation, and startup/recovery checks.
+Current MVP flow supports item registration, stock-in, invoice creation, partial refunds with over-refund protection, refund availability and P&L reporting, accounting period close with closed-period mutation guards, admin role management with lockout protection, backup, restore validation, and startup/recovery checks.
 
 Inspect or recover storage when normal startup is blocked:
 
