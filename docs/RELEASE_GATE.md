@@ -81,11 +81,11 @@ A release candidate is blocked if any of these fail:
 | Inventory | item registration, stock movement, stock rebuild, negative-stock guard |
 | Billing | invoice and refund create stock movement where applicable, journal, audit, event, and durable records |
 | Events | known business events validate against schemas before persistence |
-| Reporting | invoice, refund, refund availability, stock, ledger, tax, and trial balance reports rebuild from records |
+| Reporting | invoice, refund, refund availability, stock, ledger, tax, trial balance, and P&L reports rebuild from records |
 | Backup | backup manifest validates, restore validates, restored reports match source |
 | Runtime | startup health blocks recovery-required and protected storage, including partial refund side effects |
-| Facade | raw payloads validate through app command boundary before service calls |
-| UI | app shell can run the core inventory, invoice, report, backup/restore flow |
+| Facade | raw payloads validate through app command boundary before service calls and role permissions are enforced |
+| UI | app shell can run the core inventory, invoice, report, role-management, backup/restore flow |
 
 ---
 
@@ -94,7 +94,7 @@ A release candidate is blocked if any of these fail:
 On a desktop host with Qt native libraries installed, run:
 
 ```bash
-uv run bms-gui
+BMS_DATA_ROOT=/tmp/bms-gui-smoke-data uv run bms-gui
 ```
 
 Then complete this workflow:
@@ -104,9 +104,23 @@ Inventory tab: register item with opening stock
 Billing tab: create invoice for that item
 Billing tab: create a partial refund for that invoice
 Reports tab: confirm invoice total, refund total, still-refundable quantity, stock on hand, tax payable, and balanced trial balance
+Reports tab: close the accounting period
+Billing tab: confirm a new invoice for that closed period is blocked
 Backup tab: create backup
 Backup tab: validate restore into a clean target directory
 ```
+
+Expected visible results after the invoice and one-unit refund:
+
+| Check | Expected value |
+|---|---|
+| Invoice total | `118000` |
+| Refund total | `59000` |
+| Refundable remaining | `50000` |
+| Stock on hand | `4` |
+| Tax payable | `9000` |
+| Trial balance | `Balanced` |
+| Closed-period invoice attempt | blocked with a closed-period error |
 
 Any crash, silent failure, or report mismatch blocks the release candidate.
 
@@ -130,8 +144,6 @@ A release candidate must not be tagged from a commit with failing CI.
 
 These items are still outside the current MVP-safe bar and must not be marketed as complete:
 
-- role-based permissions UI
-- P&L report completion
 - restore-over-live-data workflow
 - cloud sync
 - plugins or marketplace

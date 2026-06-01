@@ -53,6 +53,18 @@ The current release-blocking gap is manual, not architectural: a human must stil
 
 ---
 
+# Current Validation Status
+
+Last local validation: 2026-06-01
+
+| Check | Result | Notes |
+|---|---|---|
+| Full automated gate | Passed | `./scripts/verify` passed native C tests and Python unit/integration tests |
+| Offscreen UI smoke | Passed | `QT_QPA_PLATFORM=offscreen BMS_DATA_ROOT=/tmp/bms-gui-smoke-data uv run python -m unittest tests.unit.test_ui_main` |
+| Interactive desktop smoke | Pending | Headless container could not initialize the Qt `xcb` display plugin; run this on a real desktop host before tagging |
+
+---
+
 # Required Gate
 
 Before tagging this candidate, run:
