@@ -100,7 +100,7 @@ Reports tab: confirm invoice total, refund total, still-refundable quantity, sto
 Reports tab: close the accounting period
 Billing tab: confirm a new invoice for that closed period is blocked
 Backup tab: create backup
-Backup tab: validate restore into a clean target directory
+Backup tab: validate clean restore into a clean target directory
 ```
 
 Expected visible results after the invoice and one-unit refund:

@@ -48,7 +48,10 @@ class UiMainTests(unittest.TestCase):
             self.assertEqual(window.refund_availability_table.rowCount(), 1)
             self.assertEqual(window.refund_availability_table.item(0, 5).text(), "1")
             self.assertTrue(Path(window.backup_path_label.text()).exists())
-            self.assertEqual(window.status_label.text(), f"Restore validated at {Path(temp_dir) / 'restored'}")
+            self.assertEqual(
+                window.status_label.text(),
+                f"Restore validation completed at {Path(temp_dir) / 'restored'}",
+            )
             window.close()
             app.processEvents()
 
@@ -161,7 +164,9 @@ class UiMainTests(unittest.TestCase):
         self.assertTrue(window.close_period_button.isEnabled())
         self.assertFalse(window.restore_button.isEnabled())
         self.assertIn("Backup path", window.restore_button.toolTip())
-        self.assertIn("Restore target", window.restore_button.toolTip())
+        self.assertIn("Clean target", window.restore_button.toolTip())
+        self.assertIn("Live data is not overwritten", window.restore_policy_label.text())
+        self.assertEqual(window.restore_button.text(), "Validate Clean Restore")
 
         window.invoice_item_id_input.clear()
 

@@ -321,17 +321,25 @@ def build_main_window_class():
             )
             self.backup_counts_table = _table(qt, ["File", "Records"])
 
-            restore_group = qt.QGroupBox("Restore Validation")
+            restore_group = qt.QGroupBox("Restore Validation Only")
             restore_form = qt.QFormLayout(restore_group)
             self.restore_backup_path_input = qt.QLineEdit()
             self.restore_target_input = qt.QLineEdit()
-            self.restore_button = qt.QPushButton("Validate Restore")
+            self.restore_policy_label = qt.QLabel(
+                "Restores are validated into a clean target. Live data is not overwritten."
+            )
+            self.restore_policy_label.setWordWrap(True)
+            self.restore_policy_label.setTextInteractionFlags(
+                qt.Qt.TextInteractionFlag.TextSelectableByMouse
+            )
+            self.restore_button = qt.QPushButton("Validate Clean Restore")
             self.restore_button.setIcon(
                 self.style().standardIcon(qt.QStyle.StandardPixmap.SP_BrowserReload)
             )
             self.restore_button.clicked.connect(self.restore_backup)
+            restore_form.addRow(self.restore_policy_label)
             restore_form.addRow("Backup path", self.restore_backup_path_input)
-            restore_form.addRow("Restore target", self.restore_target_input)
+            restore_form.addRow("Clean target", self.restore_target_input)
             restore_form.addRow(self.restore_button)
 
             layout.addLayout(actions)
@@ -537,7 +545,7 @@ def build_main_window_class():
                         )
                     ],
                 )
-                self._set_status("Backup created")
+                self._set_status("Backup created; restore validation target prepared")
             except Exception as exc:
                 self._show_error(exc)
 
@@ -564,7 +572,9 @@ def build_main_window_class():
                         )
                     ],
                 )
-                self._set_status(f"Restore validated at {result['restored_root']}")
+                self._set_status(
+                    f"Restore validation completed at {result['restored_root']}"
+                )
             except Exception as exc:
                 self._show_error(exc)
 
@@ -688,7 +698,7 @@ def build_main_window_class():
                     (
                         ("Operator", self._current_actor_id()),
                         ("Backup path", self.restore_backup_path_input.text()),
-                        ("Restore target", self.restore_target_input.text()),
+                        ("Clean target", self.restore_target_input.text()),
                     ),
                 ),
                 (
