@@ -46,6 +46,7 @@ The automated gate proves:
 | Append-only checksums and WAL recovery rules are tested | Proven | `tests/core/test_bms_core_storage.c`, `tests/unit/test_core_file_store.py`, `tests/unit/test_application_recovery.py` |
 | Protected-mode storage blocks normal startup | Proven | `tests/unit/test_startup_health_service.py`, `tests/unit/test_application_command_facade.py` |
 | Backup restore validates counts and restored business state | Proven | `tests/integration/test_mvp_integrity_gate.py`, `tests/unit/test_backup_service.py` |
+| Restore-over-live-data fails closed pending a guarded replacement workflow | Proven | `tests/unit/test_backup_service.py`, `docs/BACKUP_RECOVERY.md` |
 | Manual desktop smoke on native host | Required before tag | Run the checklist below with `uv run bms-gui` |
 
 The current release-blocking gap is manual, not architectural: a human must still run the native desktop smoke on a machine with Qt libraries and compare the visible reports to the expected lifecycle results.
