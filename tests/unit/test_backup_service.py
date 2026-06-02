@@ -72,6 +72,17 @@ class BackupServiceTests(unittest.TestCase):
             with self.assertRaisesRegex(BackupError, "not empty"):
                 BackupService.restore_backup(backup.backup_path, restore_root)
 
+    def test_restore_over_live_data_is_explicitly_unsupported(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "live"
+            store = initialize_data_root(root)
+            backup = BackupService(store).create_backup(
+                created_at="2026-05-14T03:00:00Z"
+            )
+
+            with self.assertRaisesRegex(BackupError, "restore over live data"):
+                BackupService.restore_over_live_data(backup.backup_path, root)
+
 
 def _services(
     root: Path,

@@ -10,6 +10,7 @@ from bms.domain.reporting.models import (
     InvoiceReportRow,
     LedgerReport,
     LedgerReportRow,
+    ProfitAndLossReport,
     RefundAvailabilityReport,
     RefundAvailabilityReportRow,
     RefundReport,
@@ -139,6 +140,20 @@ class LedgerReportSchema(_ReportSchema):
 
     @classmethod
     def from_report(cls, report: LedgerReport) -> LedgerReportSchema:
+        return cls.model_validate(report)
+
+
+class ProfitAndLossReportSchema(_ReportSchema):
+    period_id: str
+    currency: str
+    revenue_minor: int = Field(ge=0)
+    contra_revenue_minor: int = Field(ge=0)
+    net_revenue_minor: int
+    expense_minor: int = Field(ge=0)
+    net_income_minor: int
+
+    @classmethod
+    def from_report(cls, report: ProfitAndLossReport) -> ProfitAndLossReportSchema:
         return cls.model_validate(report)
 
 

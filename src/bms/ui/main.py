@@ -64,6 +64,8 @@ def build_main_window_class():
             )
             self.setWindowTitle("BMS-GUI")
             self.resize(1160, 760)
+            self._initial_item_id = _new_business_id("ITEM")
+            self._initial_invoice_id = _new_business_id("INV")
 
             self.status_label = qt.QLabel("Ready")
             self.status_label.setTextInteractionFlags(
@@ -77,19 +79,35 @@ def build_main_window_class():
                 )
             if self.actor_selector.count() == 0:
                 self.actor_selector.addItem("No active operator", "")
+            self.period_input = qt.QLineEdit("FY2026-05")
+            self.period_input.setMaximumWidth(120)
+            self.period_input.editingFinished.connect(self._refresh_reports_from_input)
+            self.currency_input = qt.QLineEdit("INR")
+            self.currency_input.setMaximumWidth(70)
+            self.currency_input.editingFinished.connect(
+                self._refresh_reports_from_input
+            )
 
             tabs = qt.QTabWidget()
             tabs.addTab(self._build_inventory_tab(), "Inventory")
             tabs.addTab(self._build_billing_tab(), "Billing")
             tabs.addTab(self._build_reports_tab(), "Reports")
+            tabs.addTab(self._build_users_tab(), "Users")
             tabs.addTab(self._build_backup_tab(), "Backup")
             self.setCentralWidget(tabs)
 
             status_bar = qt.QStatusBar()
             status_bar.addWidget(self.status_label, 1)
+            status_bar.addPermanentWidget(qt.QLabel("Period"))
+            status_bar.addPermanentWidget(self.period_input)
+            status_bar.addPermanentWidget(qt.QLabel("Currency"))
+            status_bar.addPermanentWidget(self.currency_input)
             status_bar.addPermanentWidget(self.actor_selector)
             self.setStatusBar(status_bar)
+            self._connect_action_state_inputs()
+            self._sync_action_states()
             self.refresh_reports()
+            self.refresh_users()
 
         def _build_inventory_tab(self):
             page = qt.QWidget()
@@ -98,9 +116,11 @@ def build_main_window_class():
 
             form_group = qt.QGroupBox("Item Setup")
             form = qt.QFormLayout(form_group)
-            self.item_id_input = qt.QLineEdit("ITEM-1")
-            self.sku_input = qt.QLineEdit("SKU-1")
-            self.item_name_input = qt.QLineEdit("Test Item")
+            self.item_id_input = qt.QLineEdit(self._initial_item_id)
+            self.sku_input = qt.QLineEdit(
+                self._initial_item_id.replace("ITEM", "SKU", 1)
+            )
+            self.item_name_input = qt.QLineEdit("New Item")
             self.opening_stock_input = _spin_box(qt, 0, 1_000_000, 5)
             form.addRow("Item ID", self.item_id_input)
             form.addRow("SKU", self.sku_input)
@@ -122,6 +142,7 @@ def build_main_window_class():
             self.stock_table = _table(
                 qt, ["Item", "SKU", "Name", "On hand", "Low stock"]
             )
+            self.stock_table.itemSelectionChanged.connect(self._apply_stock_selection)
             stock_layout.addWidget(self.stock_table)
 
             layout.addWidget(form_group, 0, 0)
@@ -135,16 +156,20 @@ def build_main_window_class():
 
             form_group = qt.QGroupBox("Invoice")
             form = qt.QFormLayout(form_group)
-            self.invoice_id_input = qt.QLineEdit("INV-1001")
-            self.customer_id_input = qt.QLineEdit("CUS-1")
-            self.invoice_item_id_input = qt.QLineEdit("ITEM-1")
+            self.invoice_id_input = qt.QLineEdit(self._initial_invoice_id)
+            self.customer_id_input = qt.QLineEdit("WALK-IN")
+            self.invoice_item_id_input = qt.QLineEdit(self._initial_item_id)
             self.invoice_quantity_input = _spin_box(qt, 1, 1_000_000, 2)
             self.invoice_unit_price_input = _spin_box(qt, 0, 1_000_000_000, 50000)
+            self.invoice_payment_method_input = qt.QComboBox()
+            for payment_method in ("cash", "card", "upi", "bank_transfer"):
+                self.invoice_payment_method_input.addItem(payment_method)
             form.addRow("Invoice ID", self.invoice_id_input)
             form.addRow("Customer ID", self.customer_id_input)
             form.addRow("Item ID", self.invoice_item_id_input)
             form.addRow("Quantity", self.invoice_quantity_input)
             form.addRow("Unit price minor", self.invoice_unit_price_input)
+            form.addRow("Payment method", self.invoice_payment_method_input)
 
             actions = qt.QHBoxLayout()
             self.create_invoice_button = qt.QPushButton("Create")
@@ -172,11 +197,12 @@ def build_main_window_class():
 
             refund_group = qt.QGroupBox("Refund")
             refund_form = qt.QFormLayout(refund_group)
-            self.refund_id_input = qt.QLineEdit("REF-1001")
-            self.refund_invoice_id_input = qt.QLineEdit("INV-1001")
-            self.refund_item_id_input = qt.QLineEdit("ITEM-1")
+            self.refund_id_input = qt.QLineEdit(_new_business_id("REF"))
+            self.refund_invoice_id_input = qt.QLineEdit(self._initial_invoice_id)
+            self.refund_item_id_input = qt.QLineEdit(self._initial_item_id)
             self.refund_quantity_input = _spin_box(qt, 1, 1_000_000, 1)
             self.refund_unit_price_input = _spin_box(qt, 0, 1_000_000_000, 50000)
+            self.refund_reason_input = qt.QLineEdit("customer return")
             self.refund_restock_input = qt.QCheckBox()
             self.refund_restock_input.setChecked(True)
             refund_form.addRow("Refund ID", self.refund_id_input)
@@ -184,6 +210,7 @@ def build_main_window_class():
             refund_form.addRow("Item ID", self.refund_item_id_input)
             refund_form.addRow("Quantity", self.refund_quantity_input)
             refund_form.addRow("Unit price minor", self.refund_unit_price_input)
+            refund_form.addRow("Reason", self.refund_reason_input)
             refund_form.addRow("Restock", self.refund_restock_input)
 
             refund_actions = qt.QHBoxLayout()
@@ -229,20 +256,40 @@ def build_main_window_class():
             self.report_refundable_remaining_label = qt.QLabel("0")
             self.report_tax_payable_label = qt.QLabel("0")
             self.report_trial_balance_label = qt.QLabel("Unknown")
+            self.report_net_revenue_label = qt.QLabel("0")
+            self.report_expense_label = qt.QLabel("0")
+            self.report_net_income_label = qt.QLabel("0")
             summary.addRow("Invoice total", self.report_invoice_total_label)
             summary.addRow("Refund total", self.report_refund_total_label)
-            summary.addRow("Refundable remaining", self.report_refundable_remaining_label)
+            summary.addRow(
+                "Refundable remaining", self.report_refundable_remaining_label
+            )
             summary.addRow("Tax payable", self.report_tax_payable_label)
             summary.addRow("Trial balance", self.report_trial_balance_label)
+            summary.addRow("Net revenue", self.report_net_revenue_label)
+            summary.addRow("Expense", self.report_expense_label)
+            summary.addRow("Net income", self.report_net_income_label)
+            self.close_period_button = qt.QPushButton("Close Period")
+            self.close_period_button.setIcon(
+                self.style().standardIcon(qt.QStyle.StandardPixmap.SP_DialogApplyButton)
+            )
+            self.close_period_button.clicked.connect(self.close_period)
+            summary.addRow(self.close_period_button)
 
             self.invoice_table = _table(
                 qt, ["Invoice", "Customer", "Subtotal", "Tax", "Total"]
+            )
+            self.invoice_table.itemSelectionChanged.connect(
+                self._apply_invoice_selection
             )
             self.refund_table = _table(
                 qt, ["Refund", "Invoice", "Reason", "Subtotal", "Tax", "Total"]
             )
             self.refund_availability_table = _table(
                 qt, ["Invoice", "Item", "Unit price", "Sold", "Refunded", "Remaining"]
+            )
+            self.refund_availability_table.itemSelectionChanged.connect(
+                self._apply_refund_availability_selection
             )
             self.ledger_table = _table(
                 qt, ["Account", "Name", "Debit", "Credit", "Balance"]
@@ -274,17 +321,25 @@ def build_main_window_class():
             )
             self.backup_counts_table = _table(qt, ["File", "Records"])
 
-            restore_group = qt.QGroupBox("Restore Validation")
+            restore_group = qt.QGroupBox("Restore Validation Only")
             restore_form = qt.QFormLayout(restore_group)
             self.restore_backup_path_input = qt.QLineEdit()
             self.restore_target_input = qt.QLineEdit()
-            self.restore_button = qt.QPushButton("Validate Restore")
+            self.restore_policy_label = qt.QLabel(
+                "Restores are validated into a clean target. Live data is not overwritten."
+            )
+            self.restore_policy_label.setWordWrap(True)
+            self.restore_policy_label.setTextInteractionFlags(
+                qt.Qt.TextInteractionFlag.TextSelectableByMouse
+            )
+            self.restore_button = qt.QPushButton("Validate Clean Restore")
             self.restore_button.setIcon(
                 self.style().standardIcon(qt.QStyle.StandardPixmap.SP_BrowserReload)
             )
             self.restore_button.clicked.connect(self.restore_backup)
+            restore_form.addRow(self.restore_policy_label)
             restore_form.addRow("Backup path", self.restore_backup_path_input)
-            restore_form.addRow("Restore target", self.restore_target_input)
+            restore_form.addRow("Clean target", self.restore_target_input)
             restore_form.addRow(self.restore_button)
 
             layout.addLayout(actions)
@@ -293,18 +348,60 @@ def build_main_window_class():
             layout.addWidget(restore_group)
             return page
 
+        def _build_users_tab(self):
+            page = qt.QWidget()
+            layout = qt.QGridLayout(page)
+            layout.setColumnStretch(1, 1)
+
+            editor_group = qt.QGroupBox("Role Assignment")
+            editor = qt.QFormLayout(editor_group)
+            self.user_actor_id_input = qt.QLineEdit()
+            self.user_actor_id_input.setReadOnly(True)
+            self.user_display_name_label = qt.QLabel("No user selected")
+            self.user_admin_input = qt.QCheckBox("Admin")
+            self.user_cashier_input = qt.QCheckBox("Cashier")
+            self.user_accountant_input = qt.QCheckBox("Accountant")
+            self.user_active_input = qt.QCheckBox()
+            self.user_active_input.setChecked(True)
+            editor.addRow("Actor ID", self.user_actor_id_input)
+            editor.addRow("Name", self.user_display_name_label)
+            editor.addRow("Admin", self.user_admin_input)
+            editor.addRow("Cashier", self.user_cashier_input)
+            editor.addRow("Accountant", self.user_accountant_input)
+            editor.addRow("Active", self.user_active_input)
+
+            user_actions = qt.QHBoxLayout()
+            self.update_user_roles_button = qt.QPushButton("Apply Roles")
+            self.update_user_roles_button.setIcon(
+                self.style().standardIcon(qt.QStyle.StandardPixmap.SP_DialogApplyButton)
+            )
+            self.update_user_roles_button.clicked.connect(self.update_user_roles)
+            user_actions.addWidget(self.update_user_roles_button)
+            user_actions.addStretch(1)
+            editor.addRow(user_actions)
+
+            users_group = qt.QGroupBox("Users")
+            users_layout = qt.QVBoxLayout(users_group)
+            self.users_table = _table(qt, ["Actor", "Name", "Roles", "Active"])
+            self.users_table.itemSelectionChanged.connect(self._apply_user_selection)
+            users_layout.addWidget(self.users_table)
+
+            layout.addWidget(editor_group, 0, 0)
+            layout.addWidget(users_group, 0, 1)
+            return page
+
         def register_item(self) -> None:
             try:
-                item_id = self.item_id_input.text().strip()
+                item_id = self._required_text("Item ID", self.item_id_input)
                 self.facade.register_item(
                     {
                         "item": {
                             "item_id": item_id,
-                            "sku": self.sku_input.text().strip(),
-                            "name": self.item_name_input.text().strip(),
+                            "sku": self._required_text("SKU", self.sku_input),
+                            "name": self._required_text("Name", self.item_name_input),
                             "active": True,
                         },
-                        "actor_id": self._current_actor_id(),
+                        "actor_id": self._required_actor_id(),
                         "created_at": _timestamp(),
                         "correlation_id": f"corr_item_{item_id}",
                     }
@@ -318,37 +415,46 @@ def build_main_window_class():
                             "movement_type": "adjustment",
                             "quantity_delta": opening_stock,
                             "timestamp": _timestamp(),
-                            "actor_id": self._current_actor_id(),
+                            "actor_id": self._required_actor_id(),
                             "reason": "opening stock",
                             "source_module": "inventory",
                             "source_document_id": f"OPEN-{item_id}",
                             "correlation_id": f"corr_open_{item_id}",
                         }
                     )
+                self.invoice_item_id_input.setText(item_id)
+                self.refund_item_id_input.setText(item_id)
                 self._set_status(f"Registered {item_id}")
+                self._sync_action_states()
                 self.refresh_reports()
             except Exception as exc:
                 self._show_error(exc)
 
         def create_invoice(self) -> None:
             try:
-                invoice_id = self.invoice_id_input.text().strip()
+                invoice_id = self._required_text("Invoice ID", self.invoice_id_input)
                 result = self.facade.create_invoice(
                     {
                         "invoice_id": invoice_id,
-                        "customer_id": self.customer_id_input.text().strip(),
-                        "period_id": "FY2026-05",
+                        "customer_id": self._required_text(
+                            "Customer ID", self.customer_id_input
+                        ),
+                        "period_id": self._current_period_id(),
                         "timestamp": _timestamp(),
-                        "actor_id": self._current_actor_id(),
+                        "actor_id": self._required_actor_id(),
                         "correlation_id": f"corr_{invoice_id}",
-                        "payment_method": "cash",
-                        "currency": "INR",
+                        "payment_method": self.invoice_payment_method_input.currentText(),
+                        "currency": self._current_currency(),
                         "lines": [
                             {
-                                "item_id": self.invoice_item_id_input.text().strip(),
+                                "item_id": self._required_text(
+                                    "Invoice item ID", self.invoice_item_id_input
+                                ),
                                 "quantity": self.invoice_quantity_input.value(),
                                 "unit_price_minor": self.invoice_unit_price_input.value(),
-                                "description": self.item_name_input.text().strip(),
+                                "description": self._required_text(
+                                    "Name", self.item_name_input
+                                ),
                             }
                         ],
                     }
@@ -357,30 +463,42 @@ def build_main_window_class():
                 self.invoice_subtotal_label.setText(str(result["subtotal_minor"]))
                 self.invoice_tax_label.setText(str(result["tax_minor"]))
                 self.invoice_total_label.setText(str(result["total_minor"]))
+                self.refund_invoice_id_input.setText(str(result["invoice_id"]))
                 self._set_status(f"Created invoice {invoice_id}")
+                self.invoice_id_input.setText(_new_business_id("INV"))
+                self.refund_id_input.setText(_new_business_id("REF"))
+                self._sync_action_states()
                 self.refresh_reports()
             except Exception as exc:
                 self._show_error(exc)
 
         def create_refund(self) -> None:
             try:
-                refund_id = self.refund_id_input.text().strip()
+                refund_id = self._required_text("Refund ID", self.refund_id_input)
                 result = self.facade.create_refund(
                     {
                         "refund_id": refund_id,
-                        "original_invoice_id": self.refund_invoice_id_input.text().strip(),
-                        "period_id": "FY2026-05",
+                        "original_invoice_id": self._required_text(
+                            "Original invoice", self.refund_invoice_id_input
+                        ),
+                        "period_id": self._current_period_id(),
                         "timestamp": _timestamp(),
-                        "actor_id": self._current_actor_id(),
+                        "actor_id": self._required_actor_id(),
                         "correlation_id": f"corr_{refund_id}",
-                        "currency": "INR",
-                        "reason": "customer return",
+                        "currency": self._current_currency(),
+                        "reason": self._required_text(
+                            "Refund reason", self.refund_reason_input
+                        ),
                         "lines": [
                             {
-                                "item_id": self.refund_item_id_input.text().strip(),
+                                "item_id": self._required_text(
+                                    "Refund item ID", self.refund_item_id_input
+                                ),
                                 "quantity": self.refund_quantity_input.value(),
                                 "unit_price_minor": self.refund_unit_price_input.value(),
-                                "description": self.item_name_input.text().strip(),
+                                "description": self._required_text(
+                                    "Name", self.item_name_input
+                                ),
                                 "restock": self.refund_restock_input.isChecked(),
                             }
                         ],
@@ -391,6 +509,8 @@ def build_main_window_class():
                 self.refund_tax_label.setText(str(result["tax_minor"]))
                 self.refund_total_label.setText(str(result["total_minor"]))
                 self._set_status(f"Created refund {refund_id}")
+                self.refund_id_input.setText(_new_business_id("REF"))
+                self._sync_action_states()
                 self.refresh_reports()
             except Exception as exc:
                 self._show_error(exc)
@@ -399,7 +519,7 @@ def build_main_window_class():
             try:
                 result = self.facade.create_backup(
                     {
-                        "actor_id": self._current_actor_id(),
+                        "actor_id": self._required_actor_id(),
                         "created_at": _timestamp(),
                     }
                 )
@@ -425,7 +545,7 @@ def build_main_window_class():
                         )
                     ],
                 )
-                self._set_status("Backup created")
+                self._set_status("Backup created; restore validation target prepared")
             except Exception as exc:
                 self._show_error(exc)
 
@@ -433,9 +553,13 @@ def build_main_window_class():
             try:
                 result = self.facade.restore_backup(
                     {
-                        "actor_id": self._current_actor_id(),
-                        "backup_path": self.restore_backup_path_input.text().strip(),
-                        "restore_root": self.restore_target_input.text().strip(),
+                        "actor_id": self._required_actor_id(),
+                        "backup_path": self._required_text(
+                            "Backup path", self.restore_backup_path_input
+                        ),
+                        "restore_root": self._required_text(
+                            "Restore target", self.restore_target_input
+                        ),
                     }
                 )
                 _set_rows(
@@ -448,18 +572,167 @@ def build_main_window_class():
                         )
                     ],
                 )
-                self._set_status(f"Restore validated at {result['restored_root']}")
+                self._set_status(
+                    f"Restore validation completed at {result['restored_root']}"
+                )
             except Exception as exc:
                 self._show_error(exc)
 
+        def close_period(self) -> None:
+            try:
+                period_id = self._current_period_id()
+                self.facade.close_period(
+                    {
+                        "period_id": period_id,
+                        "actor_id": self._required_actor_id(),
+                        "closed_at": _timestamp(),
+                        "correlation_id": f"corr_close_{period_id}",
+                    }
+                )
+                self._set_status(f"Closed period {period_id}")
+                self._sync_action_states()
+                self.refresh_reports()
+            except Exception as exc:
+                self._show_error(exc)
+
+        def update_user_roles(self) -> None:
+            try:
+                target_actor_id = self._required_text(
+                    "User", self.user_actor_id_input
+                )
+                roles = self._selected_user_roles()
+                self.facade.update_user_roles(
+                    {
+                        "actor_id": self._required_actor_id(),
+                        "target_actor_id": target_actor_id,
+                        "roles": roles,
+                        "active": self.user_active_input.isChecked(),
+                        "updated_at": _timestamp(),
+                        "correlation_id": f"corr_roles_{target_actor_id}",
+                    }
+                )
+                self._set_status(f"Updated roles for {target_actor_id}")
+                self.refresh_users()
+                self._reload_actor_selector()
+                self._sync_action_states()
+            except Exception as exc:
+                self._show_error(exc)
+
+        def _connect_action_state_inputs(self) -> None:
+            for widget in (
+                self.item_id_input,
+                self.sku_input,
+                self.item_name_input,
+                self.invoice_id_input,
+                self.customer_id_input,
+                self.invoice_item_id_input,
+                self.refund_id_input,
+                self.refund_invoice_id_input,
+                self.refund_item_id_input,
+                self.refund_reason_input,
+                self.period_input,
+                self.currency_input,
+                self.restore_backup_path_input,
+                self.restore_target_input,
+                self.user_actor_id_input,
+            ):
+                widget.textChanged.connect(self._sync_action_states)
+            self.actor_selector.currentIndexChanged.connect(self._sync_action_states)
+            for widget in (
+                self.user_admin_input,
+                self.user_cashier_input,
+                self.user_accountant_input,
+                self.user_active_input,
+            ):
+                widget.stateChanged.connect(self._sync_action_states)
+
+        def _sync_action_states(self, *_args) -> None:
+            action_requirements = (
+                (
+                    self.register_item_button,
+                    (
+                        ("Operator", self._current_actor_id()),
+                        ("Item ID", self.item_id_input.text()),
+                        ("SKU", self.sku_input.text()),
+                        ("Name", self.item_name_input.text()),
+                    ),
+                ),
+                (
+                    self.create_invoice_button,
+                    (
+                        ("Operator", self._current_actor_id()),
+                        ("Invoice ID", self.invoice_id_input.text()),
+                        ("Customer ID", self.customer_id_input.text()),
+                        ("Item ID", self.invoice_item_id_input.text()),
+                        ("Name", self.item_name_input.text()),
+                        ("Period", self.period_input.text()),
+                        ("Currency", self.currency_input.text()),
+                    ),
+                ),
+                (
+                    self.create_refund_button,
+                    (
+                        ("Operator", self._current_actor_id()),
+                        ("Refund ID", self.refund_id_input.text()),
+                        ("Original invoice", self.refund_invoice_id_input.text()),
+                        ("Item ID", self.refund_item_id_input.text()),
+                        ("Name", self.item_name_input.text()),
+                        ("Reason", self.refund_reason_input.text()),
+                        ("Period", self.period_input.text()),
+                        ("Currency", self.currency_input.text()),
+                    ),
+                ),
+                (
+                    self.backup_button,
+                    (("Operator", self._current_actor_id()),),
+                ),
+                (
+                    self.close_period_button,
+                    (
+                        ("Operator", self._current_actor_id()),
+                        ("Period", self.period_input.text()),
+                    ),
+                ),
+                (
+                    self.restore_button,
+                    (
+                        ("Operator", self._current_actor_id()),
+                        ("Backup path", self.restore_backup_path_input.text()),
+                        ("Clean target", self.restore_target_input.text()),
+                    ),
+                ),
+                (
+                    self.update_user_roles_button,
+                    (
+                        ("Operator", self._current_actor_id()),
+                        ("User", self.user_actor_id_input.text()),
+                        ("Role", ", ".join(self._selected_user_roles())),
+                    ),
+                ),
+            )
+            for button, requirements in action_requirements:
+                missing = [
+                    label for label, value in requirements if not str(value).strip()
+                ]
+                button.setEnabled(not missing)
+                button.setToolTip(
+                    "" if not missing else "Required: " + ", ".join(missing)
+                )
+
         def refresh_reports(self) -> None:
-            invoice_report = self.facade.invoice_report("FY2026-05")
-            refund_report = self.facade.refund_report("FY2026-05")
-            refund_availability = self.facade.refund_availability_report("FY2026-05")
+            period_id = self._current_period_id()
+            currency = self._current_currency()
+            invoice_report = self.facade.invoice_report(period_id)
+            refund_report = self.facade.refund_report(period_id)
+            refund_availability = self.facade.refund_availability_report(period_id)
             stock_report = self.facade.stock_report(low_stock_threshold=3)
-            ledger_report = self.facade.ledger_report("FY2026-05")
-            tax_report = self.facade.tax_report("FY2026-05")
-            trial_balance = self.facade.trial_balance_report("FY2026-05")
+            ledger_report = self.facade.ledger_report(period_id)
+            profit_and_loss = self.facade.profit_and_loss_report(
+                period_id,
+                currency=currency,
+            )
+            tax_report = self.facade.tax_report(period_id, currency=currency)
+            trial_balance = self.facade.trial_balance_report(period_id)
 
             invoice_total = sum(
                 total["total_minor"] for total in invoice_report["totals"]
@@ -478,6 +751,13 @@ def build_main_window_class():
             )
             self.report_trial_balance_label.setText(
                 "Balanced" if trial_balance["is_balanced"] else "Unbalanced"
+            )
+            self.report_net_revenue_label.setText(
+                str(profit_and_loss["net_revenue_minor"])
+            )
+            self.report_expense_label.setText(str(profit_and_loss["expense_minor"]))
+            self.report_net_income_label.setText(
+                str(profit_and_loss["net_income_minor"])
             )
 
             _set_rows(
@@ -553,8 +833,136 @@ def build_main_window_class():
                 ],
             )
 
+        def refresh_users(self) -> None:
+            actor_id = self._current_actor_id()
+            if not actor_id:
+                _set_rows(qt, self.users_table, [])
+                return
+            rows = self.facade.user_roles({"actor_id": actor_id})
+            _set_rows(
+                qt,
+                self.users_table,
+                [
+                    [
+                        row["actor_id"],
+                        row["display_name"],
+                        ", ".join(row["roles"]),
+                        "Yes" if row["active"] else "No",
+                    ]
+                    for row in rows
+                ],
+            )
+
+        def _refresh_reports_from_input(self) -> None:
+            try:
+                self.refresh_reports()
+            except Exception as exc:
+                self._show_error(exc)
+
+        def _reload_actor_selector(self) -> None:
+            current_actor_id = self._current_actor_id()
+            self.actor_selector.clear()
+            for session in self.facade.actor_sessions():
+                roles = ", ".join(session["roles"])
+                self.actor_selector.addItem(
+                    f"{session['display_name']} ({roles})", session["actor_id"]
+                )
+            if self.actor_selector.count() == 0:
+                self.actor_selector.addItem("No active operator", "")
+            else:
+                index = self.actor_selector.findData(current_actor_id)
+                if index >= 0:
+                    self.actor_selector.setCurrentIndex(index)
+
         def _current_actor_id(self) -> str:
             return str(self.actor_selector.currentData() or "")
+
+        def _required_actor_id(self) -> str:
+            actor_id = self._current_actor_id()
+            if not actor_id:
+                raise ValueError("Operator is required")
+            return actor_id
+
+        def _apply_stock_selection(self) -> None:
+            selected_row = self.stock_table.currentRow()
+            if selected_row < 0 or not hasattr(self, "invoice_item_id_input"):
+                return
+            item_id = _table_text(self.stock_table, selected_row, 0)
+            item_name = _table_text(self.stock_table, selected_row, 2)
+            if item_id:
+                self.invoice_item_id_input.setText(item_id)
+                self.refund_item_id_input.setText(item_id)
+            if item_name:
+                self.item_name_input.setText(item_name)
+
+        def _apply_invoice_selection(self) -> None:
+            selected_row = self.invoice_table.currentRow()
+            if selected_row < 0:
+                return
+            invoice_id = _table_text(self.invoice_table, selected_row, 0)
+            if invoice_id:
+                self.refund_invoice_id_input.setText(invoice_id)
+
+        def _apply_refund_availability_selection(self) -> None:
+            selected_row = self.refund_availability_table.currentRow()
+            if selected_row < 0:
+                return
+            invoice_id = _table_text(self.refund_availability_table, selected_row, 0)
+            item_id = _table_text(self.refund_availability_table, selected_row, 1)
+            unit_price = _table_text(self.refund_availability_table, selected_row, 2)
+            remaining = _table_text(self.refund_availability_table, selected_row, 5)
+            if invoice_id:
+                self.refund_invoice_id_input.setText(invoice_id)
+            if item_id:
+                self.refund_item_id_input.setText(item_id)
+            if unit_price.isdigit():
+                self.refund_unit_price_input.setValue(int(unit_price))
+            if remaining.isdigit():
+                self.refund_quantity_input.setValue(max(int(remaining), 1))
+
+        def _apply_user_selection(self) -> None:
+            selected_row = self.users_table.currentRow()
+            if selected_row < 0:
+                return
+            actor_id = _table_text(self.users_table, selected_row, 0)
+            display_name = _table_text(self.users_table, selected_row, 1)
+            roles = {
+                role.strip()
+                for role in _table_text(self.users_table, selected_row, 2).split(",")
+                if role.strip()
+            }
+            active = _table_text(self.users_table, selected_row, 3)
+            self.user_actor_id_input.setText(actor_id)
+            self.user_display_name_label.setText(display_name or "No user selected")
+            self.user_admin_input.setChecked("admin" in roles)
+            self.user_cashier_input.setChecked("cashier" in roles)
+            self.user_accountant_input.setChecked("accountant" in roles)
+            self.user_active_input.setChecked(active == "Yes")
+            self._sync_action_states()
+
+        def _current_period_id(self) -> str:
+            return self._required_text("Period", self.period_input)
+
+        def _current_currency(self) -> str:
+            currency = self._required_text("Currency", self.currency_input).upper()
+            self.currency_input.setText(currency)
+            return currency
+
+        def _required_text(self, label: str, widget) -> str:
+            value = widget.text().strip()
+            if not value:
+                raise ValueError(f"{label} is required")
+            return value
+
+        def _selected_user_roles(self) -> list[str]:
+            roles: list[str] = []
+            if self.user_admin_input.isChecked():
+                roles.append("admin")
+            if self.user_cashier_input.isChecked():
+                roles.append("cashier")
+            if self.user_accountant_input.isChecked():
+                roles.append("accountant")
+            return roles
 
         def _set_status(self, message: str) -> None:
             self.status_label.setText(message)
@@ -595,6 +1003,11 @@ def _set_rows(qt: SimpleNamespace, table, rows: list[list[str]]) -> None:
             table.setItem(row_index, column_index, item)
 
 
+def _table_text(table, row: int, column: int) -> str:
+    item = table.item(row, column)
+    return item.text().strip() if item is not None else ""
+
+
 def _spin_box(qt: SimpleNamespace, minimum: int, maximum: int, value: int):
     spin_box = qt.QSpinBox()
     spin_box.setRange(minimum, maximum)
@@ -605,6 +1018,11 @@ def _spin_box(qt: SimpleNamespace, minimum: int, maximum: int, value: int):
 
 def _timestamp() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _new_business_id(prefix: str) -> str:
+    timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
+    return f"{prefix}-{timestamp}-{uuid4().hex[:6].upper()}"
 
 
 def _default_data_root() -> Path:
@@ -619,7 +1037,7 @@ def _stylesheet() -> str:
     QTabBar::tab:selected { background: #ffffff; border-bottom-color: #ffffff; }
     QGroupBox { font-weight: 650; border: 1px solid #d7dde5; margin-top: 12px; padding: 12px 10px 10px 10px; background: #ffffff; }
     QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }
-    QLineEdit, QSpinBox { padding: 6px 8px; border: 1px solid #b9c3cf; background: #ffffff; min-height: 22px; }
+    QLineEdit, QSpinBox, QComboBox { padding: 6px 8px; border: 1px solid #b9c3cf; background: #ffffff; min-height: 22px; }
     QPushButton { padding: 7px 13px; border: 1px solid #9aa7b5; background: #ffffff; min-width: 86px; }
     QPushButton:hover { background: #eef3f8; }
     QHeaderView::section { background: #edf1f5; border: 0; border-bottom: 1px solid #cfd7e2; padding: 6px; font-weight: 650; }

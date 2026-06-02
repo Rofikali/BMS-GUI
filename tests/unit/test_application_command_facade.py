@@ -26,6 +26,7 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
             refund_availability = facade.refund_availability_report("FY2026-05")
             stock_report = facade.stock_report(low_stock_threshold=3)
             ledger_report = facade.ledger_report("FY2026-05")
+            profit_and_loss = facade.profit_and_loss_report("FY2026-05")
             tax_report = facade.tax_report("FY2026-05")
             trial_balance = facade.trial_balance_report("FY2026-05")
             backup = facade.create_backup(_backup_payload())
@@ -36,6 +37,13 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
                     "restore_root": str(Path(temp_dir) / "restored"),
                 }
             )
+            restored = start_command_facade(Path(temp_dir) / "restored")
+            restored_invoice_report = restored.invoice_report("FY2026-05")
+            restored_refund_report = restored.refund_report("FY2026-05")
+            restored_availability = restored.refund_availability_report("FY2026-05")
+            restored_stock_report = restored.stock_report(low_stock_threshold=3)
+            restored_tax_report = restored.tax_report("FY2026-05")
+            restored_trial_balance = restored.trial_balance_report("FY2026-05")
 
             self.assertEqual(item["item_id"], "ITEM-1")
             self.assertEqual(stock_in["quantity_on_hand"], 5)
@@ -52,12 +60,20 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
             self.assertEqual(refund_availability["rows"][0]["remaining_quantity"], 1)
             self.assertEqual(stock_report["rows"][0]["quantity_on_hand"], 4)
             self.assertEqual({row["account_code"] for row in ledger_report["rows"]}, {"1000", "2100", "4000"})
+            self.assertEqual(profit_and_loss["net_revenue_minor"], 50000)
+            self.assertEqual(profit_and_loss["net_income_minor"], 50000)
             self.assertEqual(tax_report["invoice_tax_collected_minor"], 18000)
             self.assertTrue(trial_balance["is_balanced"])
             self.assertTrue(Path(backup["backup_path"]).exists())
             self.assertEqual(backup["verified_record_counts"]["invoices"], 1)
             self.assertEqual(backup["verified_record_counts"]["refunds"], 1)
             self.assertEqual(restore["verified_record_counts"], backup["verified_record_counts"])
+            self.assertEqual(restored_invoice_report["totals"][0]["total_minor"], 118000)
+            self.assertEqual(restored_refund_report["totals"][0]["total_minor"], 59000)
+            self.assertEqual(restored_availability["rows"][0]["remaining_quantity"], 1)
+            self.assertEqual(restored_stock_report["rows"][0]["quantity_on_hand"], 4)
+            self.assertEqual(restored_tax_report["tax_payable_balance_minor"], 9000)
+            self.assertTrue(restored_trial_balance["is_balanced"])
 
     def test_facade_maps_restore_non_empty_target_to_business_error(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -89,6 +105,82 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
             self.assertEqual(sessions["usr_admin"], ["admin"])
             self.assertEqual(sessions["usr_cashier"], ["cashier"])
             self.assertEqual(sessions["usr_accountant"], ["accountant"])
+
+    def test_facade_lists_and_updates_user_roles_from_admin_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            facade = start_command_facade(Path(temp_dir))
+
+            initial_roles = {
+                row["actor_id"]: row for row in facade.user_roles({"actor_id": "usr_admin"})
+            }
+            updated = facade.update_user_roles(
+                {
+                    "actor_id": "usr_admin",
+                    "target_actor_id": "usr_cashier",
+                    "roles": ["cashier", "accountant"],
+                    "active": True,
+                    "updated_at": "2026-05-14T04:30:00Z",
+                    "correlation_id": "corr_roles_usr_cashier",
+                }
+            )
+            reloaded = start_command_facade(Path(temp_dir))
+            sessions = {
+                session["actor_id"]: session["roles"]
+                for session in reloaded.actor_sessions()
+            }
+
+            self.assertEqual(initial_roles["usr_cashier"]["roles"], ["cashier"])
+            self.assertEqual(updated["actor_id"], "usr_cashier")
+            self.assertEqual(updated["roles"], ["cashier", "accountant"])
+            self.assertEqual(sessions["usr_cashier"], ["cashier", "accountant"])
+
+    def test_facade_rejects_unauthorized_user_role_update(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            facade = start_command_facade(Path(temp_dir))
+
+            with self.assertRaises(ApplicationCommandError) as context:
+                facade.update_user_roles(
+                    {
+                        "actor_id": "usr_cashier",
+                        "target_actor_id": "usr_accountant",
+                        "roles": ["admin"],
+                        "active": True,
+                        "updated_at": "2026-05-14T04:30:00Z",
+                        "correlation_id": "corr_roles_blocked",
+                    }
+                )
+
+            self.assertEqual(context.exception.code, ApplicationErrorCode.UNAUTHORIZED)
+            self.assertEqual(context.exception.operation, "auth.update_user_roles")
+
+    def test_facade_rejects_removing_last_active_admin(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            facade = start_command_facade(Path(temp_dir))
+            facade.update_user_roles(
+                {
+                    "actor_id": "usr_admin",
+                    "target_actor_id": "usr_inventory",
+                    "roles": ["cashier"],
+                    "active": False,
+                    "updated_at": "2026-05-14T04:25:00Z",
+                    "correlation_id": "corr_roles_inventory_no_admin",
+                }
+            )
+
+            with self.assertRaises(ApplicationCommandError) as context:
+                facade.update_user_roles(
+                    {
+                        "actor_id": "usr_admin",
+                        "target_actor_id": "usr_admin",
+                        "roles": ["cashier"],
+                        "active": True,
+                        "updated_at": "2026-05-14T04:30:00Z",
+                        "correlation_id": "corr_roles_no_admin",
+                    }
+                )
+
+            self.assertEqual(context.exception.code, ApplicationErrorCode.UNAUTHORIZED)
+            self.assertEqual(context.exception.operation, "auth.update_user_roles")
 
     def test_facade_authorizes_from_roles_file_not_payload_claims(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -207,6 +299,40 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
             self.assertEqual(context.exception.operation, "accounting.post_journal")
             self.assertIsInstance(context.exception.__cause__, AccountingError)
 
+    def test_facade_closes_period_and_blocks_later_financial_mutations(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            facade = start_command_facade(Path(temp_dir))
+            facade.register_item(_register_item_payload())
+            facade.commit_stock_movement(_stock_movement_payload("MOV-CLOSE-FACADE-IN", 5, "adjustment"))
+            facade.create_invoice(_invoice_payload())
+
+            closed = facade.close_period(_close_period_payload())
+            blocked_invoice = _invoice_payload()
+            blocked_invoice["invoice_id"] = "INV-FACADE-CLOSED"
+            blocked_invoice["correlation_id"] = "corr_INV_FACADE_CLOSED"
+
+            self.assertEqual(closed["period_id"], "FY2026-05")
+            self.assertEqual(closed["status"], "closed")
+            self.assertEqual(closed["actor_id"], "usr_accountant")
+            with self.assertRaises(ApplicationCommandError) as context:
+                facade.create_invoice(blocked_invoice)
+
+            self.assertEqual(context.exception.code, ApplicationErrorCode.BUSINESS_RULE)
+            self.assertEqual(context.exception.operation, "billing.create_invoice")
+            self.assertIsInstance(context.exception.__cause__, BillingError)
+
+    def test_facade_rejects_unauthorized_period_close_before_service_call(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            facade = start_command_facade(Path(temp_dir))
+            payload = _close_period_payload()
+            payload["actor_id"] = "usr_cashier"
+
+            with self.assertRaises(ApplicationCommandError) as context:
+                facade.close_period(payload)
+
+            self.assertEqual(context.exception.code, ApplicationErrorCode.UNAUTHORIZED)
+            self.assertEqual(context.exception.operation, "accounting.close_period")
+
     def test_facade_maps_insufficient_stock_to_business_error(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             facade = start_command_facade(Path(temp_dir))
@@ -250,6 +376,15 @@ def _backup_payload() -> dict[str, object]:
     return {
         "actor_id": "usr_admin",
         "created_at": "2026-05-14T03:00:00Z",
+    }
+
+
+def _close_period_payload() -> dict[str, object]:
+    return {
+        "period_id": "FY2026-05",
+        "actor_id": "usr_accountant",
+        "closed_at": "2026-05-14T04:00:00Z",
+        "correlation_id": "corr_close_FY2026_05",
     }
 
 

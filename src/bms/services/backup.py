@@ -18,6 +18,12 @@ class BackupError(ValueError):
     pass
 
 
+LIVE_RESTORE_UNSUPPORTED_MESSAGE = (
+    "restore over live data is not supported; restore into a clean target and "
+    "validate the restored reports before replacing a live data root"
+)
+
+
 @dataclass(frozen=True)
 class BackupResult:
     backup_path: Path
@@ -98,6 +104,10 @@ class BackupService:
             restored_root=restored_root,
             verified_record_counts=verified_record_counts,
         )
+
+    @staticmethod
+    def restore_over_live_data(backup_path: Path, live_root: Path) -> RestoreResult:
+        raise BackupError(LIVE_RESTORE_UNSUPPORTED_MESSAGE)
 
     @staticmethod
     def validate_data_root(data_root: Path) -> dict[str, int]:

@@ -131,6 +131,39 @@ for normal crash recovery.
 
 ---
 
+# 4.0 MVP RESTORE POLICY
+
+MVP restore is validation-first and clean-target-only.
+
+Supported:
+
+- create a backup from the current data root
+- restore that backup into an empty target directory
+- validate restored record counts against the backup manifest
+- rebuild reports from the restored data root
+- compare restored invoice, refund, stock, tax, ledger, and trial-balance results
+
+Explicitly not supported in the MVP:
+
+- restoring directly over a live data root
+- merging restored files into an existing data root
+- replacing live data without a pre-restore backup and protected-mode transition
+
+Any restore-over-live-data command must fail closed. The operator must restore
+into a clean target, validate the restored reports, and then perform any live
+replacement only through a future guarded workflow that records audit evidence.
+
+Future live restore must require:
+
+- automatic pre-restore backup of the current live data root
+- protected-mode entry before file replacement
+- manifest and checksum validation before and after replacement
+- startup health inspection after replacement
+- report parity checks after replacement
+- audit records for every operator decision
+
+---
+
 # 4.1 BACKUP COMPONENTS
 
 The backup system includes:

@@ -5,7 +5,7 @@ from typing import Annotated, Any, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
 
-from bms.app.auth import AuthorizationPolicy, validate_actor_payload
+from bms.app.auth import ApplicationRole, AuthorizationPolicy, validate_actor_payload
 from bms.app.errors import map_application_error
 from bms.app.runtime import ApplicationRuntime, start_application
 from bms.domain.accounting import validate_post_journal_command_payload
@@ -33,6 +33,48 @@ class BackupCommandPayloadSchema(BaseModel):
     created_at: StrictStr | None = None
 
     @field_validator("backup_dir", "created_at")
+    @classmethod
+    def _optional_strings_cannot_be_empty(cls, value: str | None) -> str | None:
+        if value is not None and not value:
+            raise ValueError("optional string fields cannot be empty")
+        return value
+
+
+class ListUserRolesPayloadSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    actor_id: NonEmptyStr
+
+
+class UpdateUserRolesPayloadSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    actor_id: NonEmptyStr
+    target_actor_id: NonEmptyStr
+    roles: tuple[ApplicationRole, ...]
+    active: bool = True
+    updated_at: NonEmptyStr
+    correlation_id: NonEmptyStr
+
+    @field_validator("roles")
+    @classmethod
+    def _roles_must_be_present(cls, value: tuple[ApplicationRole, ...]) -> tuple[ApplicationRole, ...]:
+        if not value:
+            raise ValueError("at least one role is required")
+        if len(set(value)) != len(value):
+            raise ValueError("actor roles must be unique")
+        return value
+
+
+class ClosePeriodCommandPayloadSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    period_id: NonEmptyStr
+    actor_id: NonEmptyStr
+    closed_at: StrictStr | None = None
+    correlation_id: StrictStr | None = None
+
+    @field_validator("closed_at", "correlation_id")
     @classmethod
     def _optional_strings_cannot_be_empty(cls, value: str | None) -> str | None:
         if value is not None and not value:
@@ -94,6 +136,21 @@ class JournalOutputSchema(_FacadeOutputSchema):
     currency: str
 
 
+class ClosePeriodOutputSchema(_FacadeOutputSchema):
+    period_id: str
+    status: str
+    actor_id: str
+    closed_at: str | None = None
+    correlation_id: str | None = None
+
+
+class UserRoleOutputSchema(_FacadeOutputSchema):
+    actor_id: str
+    display_name: str
+    active: bool
+    roles: tuple[str, ...]
+
+
 class BackupOutputSchema(_FacadeOutputSchema):
     backup_path: str
     created_at: str
@@ -123,6 +180,43 @@ class ApplicationCommandFacade:
             ]
         except Exception as exc:
             raise map_application_error("auth.actor_sessions", exc) from exc
+
+    def user_roles(self, payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+        try:
+            ListUserRolesPayloadSchema.model_validate(payload)
+            self._authorize("auth.list_user_roles", payload)
+            return [
+                UserRoleOutputSchema(
+                    actor_id=profile.actor_id,
+                    display_name=profile.display_name,
+                    active=profile.active,
+                    roles=tuple(role.value for role in profile.roles),
+                ).model_dump(mode="json")
+                for profile in self.runtime.identity.list_user_roles()
+            ]
+        except Exception as exc:
+            raise map_application_error("auth.list_user_roles", exc) from exc
+
+    def update_user_roles(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            request = UpdateUserRolesPayloadSchema.model_validate(payload)
+            self._authorize("auth.update_user_roles", payload)
+            profile = self.runtime.identity.update_user_roles(
+                request.target_actor_id,
+                request.roles,
+                active=request.active,
+                updated_by=request.actor_id,
+                updated_at=request.updated_at,
+                correlation_id=request.correlation_id,
+            )
+            return UserRoleOutputSchema(
+                actor_id=profile.actor_id,
+                display_name=profile.display_name,
+                active=profile.active,
+                roles=tuple(role.value for role in profile.roles),
+            ).model_dump(mode="json")
+        except Exception as exc:
+            raise map_application_error("auth.update_user_roles", exc) from exc
 
     def _authorize(self, operation: str, payload: Mapping[str, Any]) -> None:
         actor = validate_actor_payload(payload)
@@ -167,6 +261,26 @@ class ApplicationCommandFacade:
             return JournalOutputSchema.model_validate(result).model_dump(mode="json")
         except Exception as exc:
             raise map_application_error("accounting.post_journal", exc) from exc
+
+    def close_period(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            self._authorize("accounting.close_period", payload)
+            request = ClosePeriodCommandPayloadSchema.model_validate(payload)
+            self.runtime.accounting.close_period(
+                request.period_id,
+                actor_id=request.actor_id,
+                closed_at=request.closed_at,
+                correlation_id=request.correlation_id,
+            )
+            return ClosePeriodOutputSchema(
+                period_id=request.period_id,
+                status="closed",
+                actor_id=request.actor_id,
+                closed_at=request.closed_at,
+                correlation_id=request.correlation_id,
+            ).model_dump(mode="json")
+        except Exception as exc:
+            raise map_application_error("accounting.close_period", exc) from exc
 
     def create_invoice(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         try:
@@ -215,6 +329,20 @@ class ApplicationCommandFacade:
             return self.runtime.reporting.export_ledger_report(period_id)
         except Exception as exc:
             raise map_application_error("reporting.ledger_report", exc) from exc
+
+    def profit_and_loss_report(
+        self,
+        period_id: str,
+        *,
+        currency: str = "INR",
+    ) -> dict[str, Any]:
+        try:
+            return self.runtime.reporting.export_profit_and_loss_report(
+                period_id,
+                currency=currency,
+            )
+        except Exception as exc:
+            raise map_application_error("reporting.profit_and_loss_report", exc) from exc
 
     def tax_report(self, period_id: str, *, currency: str = "INR") -> dict[str, Any]:
         try:

@@ -112,6 +112,17 @@ class LedgerReport:
 
 
 @dataclass(frozen=True)
+class ProfitAndLossReport:
+    period_id: str
+    currency: str
+    revenue_minor: int
+    contra_revenue_minor: int
+    net_revenue_minor: int
+    expense_minor: int
+    net_income_minor: int
+
+
+@dataclass(frozen=True)
 class TaxReport:
     period_id: str
     currency: str
