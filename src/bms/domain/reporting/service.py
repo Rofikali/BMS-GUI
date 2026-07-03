@@ -32,7 +32,7 @@ from bms.domain.reporting.schemas import (
     TrialBalanceReportSchema,
     dump_report_schema,
 )
-from bms.storage.file_store.core_store import CoreFileStore
+from bms.storage.ports import DurableStorePort
 
 
 class ReportingError(ValueError):
@@ -40,7 +40,7 @@ class ReportingError(ValueError):
 
 
 class ReportingService:
-    def __init__(self, store: CoreFileStore) -> None:
+    def __init__(self, store: DurableStorePort) -> None:
         self.store = store
 
     def get_invoice_report(self, period_id: str | None = None) -> InvoiceReport:

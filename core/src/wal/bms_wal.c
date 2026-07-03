@@ -11,6 +11,7 @@
 
 #if defined(_WIN32)
 #include <io.h>
+#include <windows.h>
 #define bms_fsync _commit
 #else
 #include <unistd.h>
@@ -37,6 +38,23 @@ static BmsStatus flush_file(FILE *file)
         return BMS_ERR_IO;
     }
     return BMS_OK;
+}
+
+static BmsStatus replace_file(const char *source_path, const char *target_path)
+{
+#if defined(_WIN32)
+    if (!MoveFileExA(source_path, target_path, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+    {
+        return BMS_ERR_IO;
+    }
+    return BMS_OK;
+#else
+    if (rename(source_path, target_path) != 0)
+    {
+        return BMS_ERR_IO;
+    }
+    return BMS_OK;
+#endif
 }
 
 static BmsStatus append_wal_record(
@@ -475,10 +493,11 @@ static BmsStatus compact_uncommitted_pending(const char *wal_path, const BmsWalT
         remove(temp_path);
         return status;
     }
-    if (rename(temp_path, wal_path) != 0)
+    status = replace_file(temp_path, wal_path);
+    if (status != BMS_OK)
     {
         remove(temp_path);
-        return BMS_ERR_IO;
+        return status;
     }
     return BMS_OK;
 }

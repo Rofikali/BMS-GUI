@@ -14,7 +14,12 @@ from bms.app import (
 )
 
 
+def _configure_qt_environment() -> None:
+    os.environ.setdefault("QT_QPA_FONTDIR", str(Path(__file__).with_name("fonts")))
+
+
 def _import_qt() -> SimpleNamespace:
+    _configure_qt_environment()
     try:
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import (

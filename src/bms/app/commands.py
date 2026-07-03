@@ -286,7 +286,7 @@ class ApplicationCommandFacade:
         try:
             self._authorize("billing.create_invoice", payload)
             command = validate_create_invoice_command_payload(payload)
-            result = self.runtime.billing.create_invoice(command)
+            result = self.runtime.create_invoice.execute(command)
             return InvoiceOutputSchema.model_validate(result).model_dump(mode="json")
         except Exception as exc:
             raise map_application_error("billing.create_invoice", exc) from exc
@@ -295,7 +295,7 @@ class ApplicationCommandFacade:
         try:
             self._authorize("billing.create_refund", payload)
             command = validate_create_refund_command_payload(payload)
-            result = self.runtime.billing.create_refund(command)
+            result = self.runtime.create_refund.execute(command)
             return RefundOutputSchema.model_validate(result).model_dump(mode="json")
         except Exception as exc:
             raise map_application_error("billing.create_refund", exc) from exc

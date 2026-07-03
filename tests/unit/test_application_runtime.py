@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from bms.app import ApplicationRuntimeError, StartupState, start_application
+from bms.app.use_cases import CreateInvoiceUseCase, CreateRefundUseCase
 from bms.app.bootstrap import initialize_data_root
 
 
@@ -16,6 +17,10 @@ class ApplicationRuntimeTests(unittest.TestCase):
             self.assertEqual(runtime.startup_health.state, StartupState.HEALTHY)
             self.assertIs(runtime.billing.inventory, runtime.inventory)
             self.assertIs(runtime.billing.accounting, runtime.accounting)
+            self.assertIsInstance(runtime.create_invoice, CreateInvoiceUseCase)
+            self.assertIsInstance(runtime.create_refund, CreateRefundUseCase)
+            self.assertIs(runtime.create_invoice.billing, runtime.billing)
+            self.assertIs(runtime.create_refund.billing, runtime.billing)
 
     def test_start_application_refuses_recovery_required_storage(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

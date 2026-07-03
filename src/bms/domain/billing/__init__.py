@@ -7,6 +7,7 @@ from bms.domain.billing.models import (
     RefundLineCommand,
     RefundResult,
 )
+from bms.domain.billing.ports import BillingPort
 from bms.domain.billing.schemas import (
     CreateInvoiceCommandSchema,
     CreateRefundCommandSchema,
@@ -19,6 +20,7 @@ from bms.domain.billing.service import BillingError, BillingService
 
 __all__ = [
     "BillingError",
+    "BillingPort",
     "BillingService",
     "CreateInvoiceCommand",
     "CreateInvoiceCommandSchema",

@@ -94,7 +94,7 @@ class BackupService:
                 target = (restored_root / member.name).resolve()
                 if not target.is_relative_to(restored_root_resolved):
                     raise BackupError(f"backup member escapes restore root: {member.name}")
-            archive.extractall(restored_root)
+            archive.extractall(restored_root, filter="data")
 
         verified_record_counts = BackupService.validate_data_root(restored_root)
         if verified_record_counts != manifest.verified_record_counts:

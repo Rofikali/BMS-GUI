@@ -189,7 +189,7 @@ def find_core_library() -> Path:
     names = {
         "linux": ("libbms_core_python.so", "libbms_core.so"),
         "darwin": ("libbms_core_python.dylib", "libbms_core.dylib"),
-        "win32": ("bms_core_python.dll", "bms_core.dll"),
+        "win32": ("bms_core_python.dll", "libbms_core_python.dll", "bms_core.dll", "libbms_core.dll"),
     }.get(sys.platform, ("libbms_core_python.so",))
     search_roots = [root / "build" / "verify", root / "build-ninja", root / "build", root]
     for search_root in search_roots:

@@ -14,6 +14,21 @@ class UiMainTests(unittest.TestCase):
 
         self.assertRegex(business_id, r"^INV-\d{14}-[0-9A-F]{6}$")
 
+    def test_qt_environment_uses_application_font_directory(self) -> None:
+        previous = os.environ.pop("QT_QPA_FONTDIR", None)
+        try:
+            ui_main._configure_qt_environment()
+
+            self.assertEqual(
+                os.environ["QT_QPA_FONTDIR"],
+                str(Path(ui_main.__file__).with_name("fonts")),
+            )
+        finally:
+            if previous is None:
+                os.environ.pop("QT_QPA_FONTDIR", None)
+            else:
+                os.environ["QT_QPA_FONTDIR"] = previous
+
     def test_main_window_runs_facade_backed_flow_when_qt_is_available(self) -> None:
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         try:

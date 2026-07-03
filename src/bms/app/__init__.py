@@ -19,6 +19,7 @@ from bms.app.recovery import (
 )
 from bms.app.runtime import ApplicationRuntime, ApplicationRuntimeError, start_application
 from bms.app.startup import StartupHealth, StartupHealthService, StartupState
+from bms.app.use_cases import CreateInvoiceUseCase, CreateRefundUseCase
 
 __all__ = [
     "ApplicationCommandError",
@@ -37,6 +38,8 @@ __all__ = [
     "RecoveryReconciliationResult",
     "ApplicationRuntime",
     "ApplicationRuntimeError",
+    "CreateInvoiceUseCase",
+    "CreateRefundUseCase",
     "StartupHealth",
     "StartupHealthService",
     "StartupState",
