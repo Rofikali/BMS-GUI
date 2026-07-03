@@ -7,12 +7,13 @@ from uuid import uuid4
 
 from bms.core import AppendRecord, BmsCore, WalRecoveryResult
 from bms.domain.events import validate_business_event_payload
+from bms.storage.ports import DurabilityCorePort
 
 
 class CoreFileStore:
     """Thin Python repository facade over the native C durability core."""
 
-    def __init__(self, data_root: Path, core: BmsCore | None = None) -> None:
+    def __init__(self, data_root: Path, core: DurabilityCorePort | None = None) -> None:
         self.data_root = data_root
         self.core = core or BmsCore()
 

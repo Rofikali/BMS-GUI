@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from bms.domain.accounting import AccountingService, JournalLine, PostJournalCommand
+from bms.domain.accounting import JournalLine, PostJournalCommand
+from bms.domain.accounting.ports import AccountingPort
 from bms.domain.billing.models import CreateInvoiceCommand, CreateRefundCommand, InvoiceResult, RefundResult
-from bms.domain.inventory import InventoryService, StockMovementCommand, StockMovementType
-from bms.storage.file_store.core_store import CoreFileStore
+from bms.domain.inventory import StockMovementCommand, StockMovementType
+from bms.domain.inventory.ports import InventoryPort
+from bms.storage.ports import DurableStorePort
 
 
 class BillingError(ValueError):
@@ -15,9 +17,9 @@ class BillingError(ValueError):
 class BillingService:
     def __init__(
         self,
-        store: CoreFileStore,
-        inventory: InventoryService,
-        accounting: AccountingService,
+        store: DurableStorePort,
+        inventory: InventoryPort,
+        accounting: AccountingPort,
         *,
         tax_rate_basis_points: int = 1800,
     ) -> None:

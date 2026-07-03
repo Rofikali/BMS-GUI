@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 from bms.domain.inventory.models import Item, StockMovementCommand, StockMovementResult, StockMovementType
-from bms.storage.file_store.core_store import CoreFileStore
+from bms.storage.ports import DurableStorePort
 
 
 class InventoryError(ValueError):
@@ -11,7 +11,7 @@ class InventoryError(ValueError):
 
 
 class InventoryService:
-    def __init__(self, store: CoreFileStore, *, allow_negative_stock: bool = False) -> None:
+    def __init__(self, store: DurableStorePort, *, allow_negative_stock: bool = False) -> None:
         self.store = store
         self.allow_negative_stock = allow_negative_stock
 

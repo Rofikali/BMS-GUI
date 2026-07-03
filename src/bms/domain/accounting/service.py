@@ -13,7 +13,7 @@ from bms.domain.accounting.models import (
     PostJournalCommand,
     TrialBalance,
 )
-from bms.storage.file_store.core_store import CoreFileStore
+from bms.storage.ports import DurableStorePort
 
 
 class AccountingError(ValueError):
@@ -23,7 +23,7 @@ class AccountingError(ValueError):
 class AccountingService:
     def __init__(
         self,
-        store: CoreFileStore,
+        store: DurableStorePort,
         accounts: dict[str, Account] | None = None,
         closed_periods: set[str] | None = None,
     ) -> None:

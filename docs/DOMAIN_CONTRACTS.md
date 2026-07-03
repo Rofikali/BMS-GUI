@@ -116,3 +116,10 @@ Failure rule: if accounting cannot post, the sale must not complete.
 All repositories are implemented by the file storage layer in MVP. A later database implementation must satisfy the same contracts.
 
 Authoritative MVP storage contract: `FILE_STORAGE_SPEC.md`.
+
+Implementation rule:
+
+- Domain services depend on storage and peer-module ports, not concrete adapters.
+- The MVP file adapter is `CoreFileStore`.
+- Future SQLite/Postgres/cloud-sync adapters must satisfy the same durable store contract before they are allowed behind application services.
+- Billing orchestration depends on `InventoryPort` and `AccountingPort`; it must not reach into inventory or accounting internals.
