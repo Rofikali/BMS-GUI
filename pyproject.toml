@@ -18,6 +18,8 @@ dev = [
 bms-gui = "bms.ui.main:main"
 bms-core-smoke = "bms.app.bootstrap:main"
 bms-recovery = "bms.app.recovery_cli:main"
+bms-demo-data = "bms.app.demo_data:main"
+bms-release-check = "bms.app.release_check:main"
 
 [build-system]
 requires = ["hatchling>=1.25"]

@@ -1,0 +1,29 @@
+{
+  "assignments": [
+    {
+      "actor_id": "usr_admin",
+      "roles": [
+        "admin"
+      ]
+    },
+    {
+      "actor_id": "usr_inventory",
+      "roles": [
+        "admin"
+      ]
+    },
+    {
+      "actor_id": "usr_cashier",
+      "roles": [
+        "cashier"
+      ]
+    },
+    {
+      "actor_id": "usr_accountant",
+      "roles": [
+        "accountant"
+      ]
+    }
+  ],
+  "schema_version": 1
+}

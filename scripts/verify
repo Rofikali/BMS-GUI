@@ -40,4 +40,7 @@ echo "==> Running Python tests"
 cd "$ROOT_DIR"
 uv run python -m unittest discover tests
 
+echo "==> Running MVP release check"
+uv run bms-release-check
+
 echo "==> Verification passed"

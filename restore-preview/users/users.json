@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "users": [
+    {
+      "active": false,
+      "actor_id": "usr_admin",
+      "display_name": "Admin"
+    },
+    {
+      "active": true,
+      "actor_id": "usr_inventory",
+      "display_name": "Inventory Admin"
+    },
+    {
+      "active": true,
+      "actor_id": "usr_cashier",
+      "display_name": "Cashier"
+    },
+    {
+      "active": true,
+      "actor_id": "usr_accountant",
+      "display_name": "Accountant"
+    }
+  ]
+}

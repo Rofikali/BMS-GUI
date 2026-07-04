@@ -41,7 +41,21 @@ The full local and CI gate is:
 ./scripts/verify
 ```
 
+On native Windows PowerShell, run the equivalent gate:
+
+```powershell
+.\scripts\verify.ps1
+```
+
 This gate must pass with no failing tests before a release candidate is tagged.
+
+The verification gate includes the product-level MVP acceptance smoke. It can also be run directly:
+
+```bash
+uv run bms-release-check
+```
+
+This command creates a clean temporary data root, runs the release lifecycle from section 1, validates the expected business totals, closes the period, verifies backup/restore, and exits non-zero on mismatch.
 
 A skipped UI test is acceptable only when the local host cannot load native Qt libraries. CI should install the Qt/GL system packages required for the PySide6 smoke test.
 

@@ -43,7 +43,13 @@ Build the native core:
 ./scripts/verify
 ```
 
-The verification script configures the C build, runs native C tests, and runs the Python unit and integration tests. It uses Ninja when available and falls back to Unix Makefiles.
+On native Windows PowerShell:
+
+```powershell
+.\scripts\verify.ps1
+```
+
+The verification script configures the C build, runs native C tests, runs the Python unit and integration tests, and runs the MVP release acceptance check. It uses Ninja when available.
 
 Run only the native core tests after configuring a build:
 
@@ -69,6 +75,18 @@ Run the desktop app:
 uv run bms-gui
 ```
 
+Create a deterministic demo data root for smoke testing or product demos:
+
+```bash
+uv run bms-demo-data --data-root data/demo
+```
+
+Run the MVP acceptance lifecycle in a clean temporary data root:
+
+```bash
+uv run bms-release-check
+```
+
 Current MVP flow supports item registration, stock-in, invoice creation, partial refunds with over-refund protection, refund availability and P&L reporting, accounting period close with closed-period mutation guards, admin role management with lockout protection, backup, restore validation, and startup/recovery checks.
 
 Inspect or recover storage when normal startup is blocked:
@@ -85,6 +103,12 @@ Run the full local verification gate:
 
 ```bash
 ./scripts/verify
+```
+
+Or on native Windows PowerShell:
+
+```powershell
+.\scripts\verify.ps1
 ```
 
 CI runs the same verification gate in `.github/workflows/ci.yml`.

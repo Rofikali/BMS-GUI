@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from bms.ui import main as ui_main
+from bms.app.bootstrap import initialize_data_root
 
 
 class UiMainTests(unittest.TestCase):
@@ -28,6 +29,15 @@ class UiMainTests(unittest.TestCase):
                 os.environ.pop("QT_QPA_FONTDIR", None)
             else:
                 os.environ["QT_QPA_FONTDIR"] = previous
+
+    def test_stylesheet_pins_readable_light_theme_colors(self) -> None:
+        stylesheet = ui_main._stylesheet()
+
+        self.assertIn("QWidget { background: #f6f7f9; color: #1f2933;", stylesheet)
+        self.assertIn("QLineEdit, QSpinBox, QComboBox { color: #111827;", stylesheet)
+        self.assertIn("QPushButton { color: #111827;", stylesheet)
+        self.assertIn("QHeaderView::section { color: #111827;", stylesheet)
+        self.assertIn("QTableWidget { color: #111827;", stylesheet)
 
     def test_main_window_runs_facade_backed_flow_when_qt_is_available(self) -> None:
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -67,6 +77,35 @@ class UiMainTests(unittest.TestCase):
                 window.status_label.text(),
                 f"Restore validation completed at {Path(temp_dir) / 'restored'}",
             )
+            window.close()
+            app.processEvents()
+
+    def test_main_window_shows_recovery_screen_when_startup_is_blocked(self) -> None:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        try:
+            qt = ui_main._import_qt()
+        except SystemExit as exc:
+            self.skipTest(str(exc))
+
+        app = qt.QApplication.instance() or qt.QApplication([])
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            store = initialize_data_root(root)
+            store.core.append_wal_pending(
+                store.wal,
+                "txn_ui_pending",
+                "2026-05-14T00:00:00Z",
+                "usr_test",
+                "corr_ui_pending",
+                {"operation": "ui.pending"},
+            )
+
+            window = ui_main.create_main_window(data_root=root)
+
+            self.assertEqual(window.windowTitle(), "BMS-GUI - Recovery Required")
+            self.assertEqual(window.recovery_error_code, "recovery_required")
+            self.assertEqual(window.recovery_data_root, root)
+            self.assertIn("recovery_required", window.status_label.text())
             window.close()
             app.processEvents()
 

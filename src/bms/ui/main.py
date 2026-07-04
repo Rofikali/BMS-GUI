@@ -10,6 +10,7 @@ from uuid import uuid4
 from bms.app import (
     ApplicationCommandError,
     ApplicationCommandFacade,
+    ApplicationErrorCode,
     start_command_facade,
 )
 
@@ -986,7 +987,57 @@ def build_main_window_class():
 def create_main_window(
     facade: ApplicationCommandFacade | None = None, data_root: Path | None = None
 ):
-    return build_main_window_class()(facade=facade, data_root=data_root)
+    try:
+        return build_main_window_class()(facade=facade, data_root=data_root)
+    except ApplicationCommandError as exc:
+        if exc.code not in {
+            ApplicationErrorCode.PROTECTED_MODE,
+            ApplicationErrorCode.RECOVERY_REQUIRED,
+        }:
+            raise
+        qt = _import_qt()
+        return _startup_blocked_window(qt, exc, data_root or _default_data_root())
+
+
+def _startup_blocked_window(qt: SimpleNamespace, error: ApplicationCommandError, data_root: Path):
+    window = qt.QMainWindow()
+    window.setWindowTitle("BMS-GUI - Recovery Required")
+    window.resize(760, 320)
+
+    page = qt.QWidget()
+    layout = qt.QVBoxLayout(page)
+
+    title = qt.QLabel("Storage recovery required")
+    title.setObjectName("startup_blocked_title")
+    title.setTextInteractionFlags(qt.Qt.TextInteractionFlag.TextSelectableByMouse)
+    layout.addWidget(title)
+
+    message = qt.QLabel(error.user_message)
+    message.setObjectName("startup_blocked_message")
+    message.setWordWrap(True)
+    message.setTextInteractionFlags(qt.Qt.TextInteractionFlag.TextSelectableByMouse)
+    layout.addWidget(message)
+
+    data_root_label = qt.QLabel(f"Data root: {data_root}")
+    data_root_label.setObjectName("startup_blocked_data_root")
+    data_root_label.setTextInteractionFlags(qt.Qt.TextInteractionFlag.TextSelectableByMouse)
+    layout.addWidget(data_root_label)
+
+    action = qt.QLabel(
+        "Use the recovery CLI to inspect, recover safe pending transactions, "
+        "or restore from a verified backup before normal startup."
+    )
+    action.setObjectName("startup_blocked_action")
+    action.setWordWrap(True)
+    action.setTextInteractionFlags(qt.Qt.TextInteractionFlag.TextSelectableByMouse)
+    layout.addWidget(action)
+
+    layout.addStretch(1)
+    window.setCentralWidget(page)
+    window.status_label = message
+    window.recovery_error_code = error.code.value
+    window.recovery_data_root = data_root
+    return window
 
 
 def _table(qt: SimpleNamespace, headers: list[str]):
@@ -1036,18 +1087,29 @@ def _default_data_root() -> Path:
 
 def _stylesheet() -> str:
     return """
+    QWidget { background: #f6f7f9; color: #1f2933; font-size: 13px; }
     QMainWindow { background: #f6f7f9; color: #1f2933; }
-    QTabWidget::pane { border: 1px solid #d7dde5; background: #ffffff; }
-    QTabBar::tab { padding: 9px 18px; border: 1px solid #d7dde5; background: #edf1f5; }
-    QTabBar::tab:selected { background: #ffffff; border-bottom-color: #ffffff; }
-    QGroupBox { font-weight: 650; border: 1px solid #d7dde5; margin-top: 12px; padding: 12px 10px 10px 10px; background: #ffffff; }
-    QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }
-    QLineEdit, QSpinBox, QComboBox { padding: 6px 8px; border: 1px solid #b9c3cf; background: #ffffff; min-height: 22px; }
-    QPushButton { padding: 7px 13px; border: 1px solid #9aa7b5; background: #ffffff; min-width: 86px; }
+    QLabel { background: transparent; color: #1f2933; }
+    QTabWidget::pane { border: 1px solid #cfd7e2; background: #ffffff; }
+    QTabBar::tab { color: #1f2933; padding: 9px 18px; border: 1px solid #cfd7e2; background: #e8edf3; }
+    QTabBar::tab:selected { color: #111827; background: #ffffff; border-bottom-color: #ffffff; }
+    QTabBar::tab:!selected:hover { background: #f1f5f9; }
+    QGroupBox { color: #111827; font-weight: 650; border: 1px solid #cfd7e2; margin-top: 12px; padding: 12px 10px 10px 10px; background: #ffffff; }
+    QGroupBox::title { color: #111827; background: #ffffff; subcontrol-origin: margin; left: 10px; padding: 0 4px; }
+    QLineEdit, QSpinBox, QComboBox { color: #111827; padding: 6px 8px; border: 1px solid #9aa7b5; background: #ffffff; min-height: 22px; selection-background-color: #2563eb; selection-color: #ffffff; }
+    QLineEdit:read-only { color: #4b5563; background: #f3f6f9; }
+    QSpinBox::up-button, QSpinBox::down-button { background: #f3f6f9; border-left: 1px solid #cfd7e2; width: 18px; }
+    QComboBox QAbstractItemView { color: #111827; background: #ffffff; selection-background-color: #e8f0fe; selection-color: #111827; }
+    QCheckBox { color: #1f2933; background: transparent; spacing: 8px; }
+    QPushButton { color: #111827; padding: 7px 13px; border: 1px solid #8fa0b3; background: #ffffff; min-width: 86px; }
     QPushButton:hover { background: #eef3f8; }
-    QHeaderView::section { background: #edf1f5; border: 0; border-bottom: 1px solid #cfd7e2; padding: 6px; font-weight: 650; }
-    QTableWidget { border: 1px solid #d7dde5; gridline-color: #edf1f5; background: #ffffff; }
-    QStatusBar { background: #ffffff; border-top: 1px solid #d7dde5; }
+    QPushButton:pressed { background: #dce7f3; }
+    QPushButton:disabled { color: #7b8794; background: #eef1f4; border-color: #c7d0da; }
+    QHeaderView::section { color: #111827; background: #e8edf3; border: 0; border-bottom: 1px solid #c3ccd7; padding: 6px; font-weight: 650; }
+    QTableWidget { color: #111827; border: 1px solid #cfd7e2; gridline-color: #e5eaf0; background: #ffffff; alternate-background-color: #f8fafc; selection-background-color: #dbeafe; selection-color: #111827; }
+    QTableCornerButton::section { background: #e8edf3; border: 0; border-bottom: 1px solid #c3ccd7; }
+    QStatusBar { color: #1f2933; background: #ffffff; border-top: 1px solid #cfd7e2; }
+    QStatusBar QLabel { color: #1f2933; background: transparent; }
     """
 
 
