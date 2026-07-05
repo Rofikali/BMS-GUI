@@ -64,8 +64,20 @@ def main(argv: list[str] | None = None) -> None:
 
 def _register_items(facade: ApplicationCommandFacade) -> None:
     for item in (
-        {"item_id": "ITEM-DEMO-RICE", "sku": "SKU-RICE-5KG", "name": "Rice 5kg", "active": True},
-        {"item_id": "ITEM-DEMO-OIL", "sku": "SKU-OIL-1L", "name": "Cooking Oil 1L", "active": True},
+        {
+            "item_id": "ITEM-DEMO-RICE",
+            "sku": "SKU-RICE-5KG",
+            "name": "Rice 5kg",
+            "active": True,
+            "business_unit": "grocery",
+        },
+        {
+            "item_id": "ITEM-DEMO-OIL",
+            "sku": "SKU-OIL-1L",
+            "name": "Cooking Oil 1L",
+            "active": True,
+            "business_unit": "grocery",
+        },
     ):
         facade.register_item(
             {

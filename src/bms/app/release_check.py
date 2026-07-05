@@ -21,6 +21,7 @@ class ReleaseCheckResult:
     refundable_remaining_minor: int
     stock_on_hand: int
     tax_payable_minor: int
+    business_unit_net_revenue_minor: int
     trial_balance_balanced: bool
     restored_trial_balance_balanced: bool
 
@@ -40,6 +41,7 @@ def run_release_check(data_root: Path, restore_root: Path) -> ReleaseCheckResult
     refund_availability = facade.refund_availability_report("FY2026-05")
     stock_report = facade.stock_report(low_stock_threshold=3)
     tax_report = facade.tax_report("FY2026-05")
+    business_unit_revenue = facade.business_unit_revenue_report("FY2026-05")
     trial_balance = facade.trial_balance_report("FY2026-05")
 
     facade.close_period(_close_period_payload())
@@ -63,6 +65,7 @@ def run_release_check(data_root: Path, restore_root: Path) -> ReleaseCheckResult
     refund_total = _first_total(refund_report)
     refundable_remaining = sum(row["remaining_subtotal_minor"] for row in refund_availability["rows"])
     stock_on_hand = stock_report["rows"][0]["quantity_on_hand"] if stock_report["rows"] else 0
+    business_unit_net_revenue = _first_business_unit_net_revenue(business_unit_revenue)
 
     _assert_equal(invoice["total_minor"], 118000, "invoice command total")
     _assert_equal(refund["total_minor"], 59000, "refund command total")
@@ -71,6 +74,7 @@ def run_release_check(data_root: Path, restore_root: Path) -> ReleaseCheckResult
     _assert_equal(refundable_remaining, 50000, "refundable remaining")
     _assert_equal(stock_on_hand, 4, "stock on hand")
     _assert_equal(tax_report["tax_payable_balance_minor"], 9000, "tax payable")
+    _assert_equal(business_unit_net_revenue, 50000, "business unit net revenue")
     if not trial_balance["is_balanced"]:
         raise ReleaseCheckError("trial balance is not balanced")
     if not restored_trial_balance["is_balanced"]:
@@ -84,6 +88,7 @@ def run_release_check(data_root: Path, restore_root: Path) -> ReleaseCheckResult
         refundable_remaining_minor=refundable_remaining,
         stock_on_hand=stock_on_hand,
         tax_payable_minor=int(tax_report["tax_payable_balance_minor"]),
+        business_unit_net_revenue_minor=business_unit_net_revenue,
         trial_balance_balanced=bool(trial_balance["is_balanced"]),
         restored_trial_balance_balanced=bool(restored_trial_balance["is_balanced"]),
     )
@@ -116,6 +121,7 @@ def _print_result(result: ReleaseCheckResult) -> None:
         f"refundable_remaining_minor={result.refundable_remaining_minor} "
         f"stock_on_hand={result.stock_on_hand} "
         f"tax_payable_minor={result.tax_payable_minor} "
+        f"business_unit_net_revenue_minor={result.business_unit_net_revenue_minor} "
         f"trial_balance_balanced={result.trial_balance_balanced} "
         f"restored_trial_balance_balanced={result.restored_trial_balance_balanced}"
     )
@@ -160,6 +166,19 @@ def _first_total(report: dict[str, object]) -> int:
     return value
 
 
+def _first_business_unit_net_revenue(report: dict[str, object]) -> int:
+    rows = report.get("rows")
+    if not isinstance(rows, list) or not rows:
+        raise ReleaseCheckError("business unit revenue report has no rows")
+    row = rows[0]
+    if not isinstance(row, dict):
+        raise ReleaseCheckError("business unit revenue row is invalid")
+    value = row.get("net_revenue_minor")
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ReleaseCheckError("business unit net revenue is invalid")
+    return value
+
+
 def _backup_payload() -> dict[str, object]:
     return {
         "actor_id": "usr_admin",
@@ -178,7 +197,13 @@ def _close_period_payload() -> dict[str, object]:
 
 def _register_item_payload() -> dict[str, object]:
     return {
-        "item": {"item_id": "ITEM-RELEASE-1", "sku": "SKU-RELEASE-1", "name": "Release Test Item", "active": True},
+        "item": {
+            "item_id": "ITEM-RELEASE-1",
+            "sku": "SKU-RELEASE-1",
+            "name": "Release Test Item",
+            "active": True,
+            "business_unit": "retail",
+        },
         "actor_id": "usr_inventory",
         "created_at": "2026-05-14T08:00:00Z",
         "correlation_id": "corr_release_item",

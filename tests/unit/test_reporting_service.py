@@ -42,6 +42,7 @@ class ReportingServiceTests(unittest.TestCase):
             profit_and_loss_report = reports.get_profit_and_loss_report("FY2026-05")
             tax_report = reports.get_tax_report("FY2026-05")
             trial_balance_report = reports.get_trial_balance_report("FY2026-05")
+            business_unit_revenue = reports.get_business_unit_revenue_report("FY2026-05")
             invoice_export = reports.export_invoice_report("FY2026-05")
             refund_export = reports.export_refund_report("FY2026-05")
             refund_availability_export = reports.export_refund_availability_report("FY2026-05")
@@ -50,6 +51,7 @@ class ReportingServiceTests(unittest.TestCase):
             profit_and_loss_export = reports.export_profit_and_loss_report("FY2026-05")
             tax_export = reports.export_tax_report("FY2026-05")
             trial_balance_export = reports.export_trial_balance_report("FY2026-05")
+            business_unit_revenue_export = reports.export_business_unit_revenue_report("FY2026-05")
 
             self.assertEqual(len(invoice_report.rows), 1)
             self.assertEqual(invoice_report.rows[0].invoice_id, "INV-REPORT-1")
@@ -73,6 +75,7 @@ class ReportingServiceTests(unittest.TestCase):
             self.assertEqual(refund_availability.rows[0].remaining_quantity, 1)
             self.assertEqual(refund_availability.rows[0].remaining_subtotal_minor, 50000)
             self.assertEqual(stock_report.rows[0].item_id, "ITEM-1")
+            self.assertEqual(stock_report.rows[0].business_unit, "grocery")
             self.assertEqual(stock_report.rows[0].quantity_on_hand, 4)
             self.assertFalse(stock_report.rows[0].low_stock)
             self.assertEqual(
@@ -87,15 +90,22 @@ class ReportingServiceTests(unittest.TestCase):
             self.assertEqual(tax_report.invoice_tax_collected_minor, 18000)
             self.assertEqual(tax_report.tax_payable_balance_minor, 9000)
             self.assertTrue(trial_balance_report.is_balanced)
+            self.assertEqual(len(business_unit_revenue.rows), 1)
+            self.assertEqual(business_unit_revenue.rows[0].business_unit, "grocery")
+            self.assertEqual(business_unit_revenue.rows[0].invoice_subtotal_minor, 100000)
+            self.assertEqual(business_unit_revenue.rows[0].refund_subtotal_minor, 50000)
+            self.assertEqual(business_unit_revenue.rows[0].net_revenue_minor, 50000)
             self.assertEqual(invoice_export["totals"][0]["total_minor"], 118000)
             self.assertEqual(refund_export["rows"][0]["refund_id"], "REF-REPORT-1")
             self.assertEqual(refund_export["totals"][0]["total_minor"], 59000)
             self.assertEqual(refund_availability_export["rows"][0]["remaining_quantity"], 1)
             self.assertEqual(stock_export["rows"][0]["quantity_on_hand"], 4)
+            self.assertEqual(stock_export["rows"][0]["business_unit"], "grocery")
             self.assertEqual({row["account_code"] for row in ledger_export["rows"]}, {"1000", "2100", "4000"})
             self.assertEqual(profit_and_loss_export["net_income_minor"], 50000)
             self.assertEqual(tax_export["invoice_tax_collected_minor"], 18000)
             self.assertTrue(trial_balance_export["is_balanced"])
+            self.assertEqual(business_unit_revenue_export["rows"][0]["business_unit"], "grocery")
 
     def test_reports_rebuild_when_snapshot_outputs_are_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -176,7 +186,7 @@ def _services(
 
 def _register_and_stock_item(inventory: InventoryService, *, quantity: int) -> None:
     inventory.register_item(
-        Item("ITEM-1", "SKU-1", "Test Item"),
+        Item("ITEM-1", "SKU-1", "Test Item", business_unit="grocery"),
         actor_id="usr_inventory",
         created_at="2026-05-14T00:00:00Z",
         correlation_id="corr_item_ITEM-1",

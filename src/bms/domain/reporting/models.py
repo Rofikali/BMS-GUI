@@ -12,6 +12,21 @@ class CurrencyTotals:
 
 
 @dataclass(frozen=True)
+class BusinessUnitRevenueRow:
+    business_unit: str
+    currency: str
+    invoice_subtotal_minor: int
+    refund_subtotal_minor: int
+    net_revenue_minor: int
+
+
+@dataclass(frozen=True)
+class BusinessUnitRevenueReport:
+    period_id: str | None
+    rows: tuple[BusinessUnitRevenueRow, ...]
+
+
+@dataclass(frozen=True)
 class InvoiceReportRow:
     invoice_id: str
     customer_id: str
@@ -82,6 +97,7 @@ class StockReportRow:
     item_id: str
     sku: str
     name: str
+    business_unit: str
     active: bool
     quantity_on_hand: int
     low_stock: bool

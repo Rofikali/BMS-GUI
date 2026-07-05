@@ -5,6 +5,8 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from bms.domain.reporting.models import (
+    BusinessUnitRevenueReport,
+    BusinessUnitRevenueRow,
     CurrencyTotals,
     InvoiceReport,
     InvoiceReportRow,
@@ -31,6 +33,23 @@ class CurrencyTotalsSchema(_ReportSchema):
     subtotal_minor: int = Field(ge=0)
     tax_minor: int = Field(ge=0)
     total_minor: int = Field(ge=0)
+
+
+class BusinessUnitRevenueRowSchema(_ReportSchema):
+    business_unit: str
+    currency: str
+    invoice_subtotal_minor: int = Field(ge=0)
+    refund_subtotal_minor: int = Field(ge=0)
+    net_revenue_minor: int
+
+
+class BusinessUnitRevenueReportSchema(_ReportSchema):
+    period_id: str | None
+    rows: tuple[BusinessUnitRevenueRowSchema, ...]
+
+    @classmethod
+    def from_report(cls, report: BusinessUnitRevenueReport) -> BusinessUnitRevenueReportSchema:
+        return cls.model_validate(report)
 
 
 class InvoiceReportRowSchema(_ReportSchema):
@@ -109,6 +128,7 @@ class StockReportRowSchema(_ReportSchema):
     item_id: str
     sku: str
     name: str
+    business_unit: str
     active: bool
     quantity_on_hand: int
     low_stock: bool

@@ -127,10 +127,12 @@ def build_main_window_class():
                 self._initial_item_id.replace("ITEM", "SKU", 1)
             )
             self.item_name_input = qt.QLineEdit("New Item")
+            self.item_business_unit_input = qt.QLineEdit("retail")
             self.opening_stock_input = _spin_box(qt, 0, 1_000_000, 5)
             form.addRow("Item ID", self.item_id_input)
             form.addRow("SKU", self.sku_input)
             form.addRow("Name", self.item_name_input)
+            form.addRow("Business unit", self.item_business_unit_input)
             form.addRow("Opening stock", self.opening_stock_input)
 
             actions = qt.QHBoxLayout()
@@ -146,7 +148,7 @@ def build_main_window_class():
             stock_group = qt.QGroupBox("Stock")
             stock_layout = qt.QVBoxLayout(stock_group)
             self.stock_table = _table(
-                qt, ["Item", "SKU", "Name", "On hand", "Low stock"]
+                qt, ["Item", "SKU", "Name", "Business unit", "On hand", "Low stock"]
             )
             self.stock_table.itemSelectionChanged.connect(self._apply_stock_selection)
             stock_layout.addWidget(self.stock_table)
@@ -300,12 +302,16 @@ def build_main_window_class():
             self.ledger_table = _table(
                 qt, ["Account", "Name", "Debit", "Credit", "Balance"]
             )
+            self.business_unit_revenue_table = _table(
+                qt, ["Business unit", "Invoice subtotal", "Refund subtotal", "Net revenue"]
+            )
 
             layout.addWidget(summary_group, 0, 0, 1, 2)
             layout.addWidget(self.invoice_table, 1, 0)
             layout.addWidget(self.refund_table, 1, 1)
             layout.addWidget(self.refund_availability_table, 2, 0, 1, 2)
             layout.addWidget(self.ledger_table, 3, 0, 1, 2)
+            layout.addWidget(self.business_unit_revenue_table, 4, 0, 1, 2)
             return page
 
         def _build_backup_tab(self):
@@ -406,6 +412,9 @@ def build_main_window_class():
                             "sku": self._required_text("SKU", self.sku_input),
                             "name": self._required_text("Name", self.item_name_input),
                             "active": True,
+                            "business_unit": self._required_text(
+                                "Business unit", self.item_business_unit_input
+                            ),
                         },
                         "actor_id": self._required_actor_id(),
                         "created_at": _timestamp(),
@@ -629,6 +638,7 @@ def build_main_window_class():
                 self.item_id_input,
                 self.sku_input,
                 self.item_name_input,
+                self.item_business_unit_input,
                 self.invoice_id_input,
                 self.customer_id_input,
                 self.invoice_item_id_input,
@@ -661,6 +671,7 @@ def build_main_window_class():
                         ("Item ID", self.item_id_input.text()),
                         ("SKU", self.sku_input.text()),
                         ("Name", self.item_name_input.text()),
+                        ("Business unit", self.item_business_unit_input.text()),
                     ),
                 ),
                 (
@@ -731,6 +742,10 @@ def build_main_window_class():
             invoice_report = self.facade.invoice_report(period_id)
             refund_report = self.facade.refund_report(period_id)
             refund_availability = self.facade.refund_availability_report(period_id)
+            business_unit_revenue = self.facade.business_unit_revenue_report(
+                period_id,
+                currency=currency,
+            )
             stock_report = self.facade.stock_report(low_stock_threshold=3)
             ledger_report = self.facade.ledger_report(period_id)
             profit_and_loss = self.facade.profit_and_loss_report(
@@ -774,6 +789,7 @@ def build_main_window_class():
                         row["item_id"],
                         row["sku"],
                         row["name"],
+                        row["business_unit"],
                         str(row["quantity_on_hand"]),
                         "Yes" if row["low_stock"] else "No",
                     ]
@@ -838,6 +854,19 @@ def build_main_window_class():
                     for row in ledger_report["rows"]
                 ],
             )
+            _set_rows(
+                qt,
+                self.business_unit_revenue_table,
+                [
+                    [
+                        row["business_unit"],
+                        str(row["invoice_subtotal_minor"]),
+                        str(row["refund_subtotal_minor"]),
+                        str(row["net_revenue_minor"]),
+                    ]
+                    for row in business_unit_revenue["rows"]
+                ],
+            )
 
         def refresh_users(self) -> None:
             actor_id = self._current_actor_id()
@@ -895,11 +924,14 @@ def build_main_window_class():
                 return
             item_id = _table_text(self.stock_table, selected_row, 0)
             item_name = _table_text(self.stock_table, selected_row, 2)
+            business_unit = _table_text(self.stock_table, selected_row, 3)
             if item_id:
                 self.invoice_item_id_input.setText(item_id)
                 self.refund_item_id_input.setText(item_id)
             if item_name:
                 self.item_name_input.setText(item_name)
+            if business_unit:
+                self.item_business_unit_input.setText(business_unit)
 
         def _apply_invoice_selection(self) -> None:
             selected_row = self.invoice_table.currentRow()

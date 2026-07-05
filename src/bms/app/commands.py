@@ -99,6 +99,7 @@ class ItemOutputSchema(_FacadeOutputSchema):
     sku: str
     name: str
     active: bool
+    business_unit: str
 
 
 class StockMovementOutputSchema(_FacadeOutputSchema):
@@ -317,6 +318,20 @@ class ApplicationCommandFacade:
             return self.runtime.reporting.export_refund_availability_report(period_id)
         except Exception as exc:
             raise map_application_error("reporting.refund_availability_report", exc) from exc
+
+    def business_unit_revenue_report(
+        self,
+        period_id: str | None = None,
+        *,
+        currency: str = "INR",
+    ) -> dict[str, Any]:
+        try:
+            return self.runtime.reporting.export_business_unit_revenue_report(
+                period_id,
+                currency=currency,
+            )
+        except Exception as exc:
+            raise map_application_error("reporting.business_unit_revenue_report", exc) from exc
 
     def stock_report(self, *, low_stock_threshold: int = 0) -> dict[str, Any]:
         try:

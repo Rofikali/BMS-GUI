@@ -41,6 +41,27 @@ class EventSchemaTests(unittest.TestCase):
             with self.assertRaisesRegex(EventSchemaError, "unknown business event"):
                 store.append_business_event("unknown.event.v1", "usr_test", {}, occurred_at="2026-05-14T00:00:00Z")
 
+    def test_inventory_item_registered_event_keeps_business_unit_dimension(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store = initialize_data_root(Path(temp_dir))
+
+            store.append_business_event(
+                "inventory.item_registered.v1",
+                "usr_inventory",
+                {
+                    "item_id": "ITEM-GROCERY",
+                    "sku": "SKU-GROCERY",
+                    "name": "Grocery Item",
+                    "active": True,
+                    "business_unit": "grocery",
+                },
+                correlation_id="corr_ITEM_GROCERY",
+                occurred_at="2026-05-14T00:00:00Z",
+            )
+
+            payload = store.read_payloads(store.business_events)[0]
+            self.assertEqual(payload["business_unit"], "grocery")
+
     def test_invalid_business_event_payload_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             store = initialize_data_root(Path(temp_dir))

@@ -1,5 +1,7 @@
 """Reporting domain module."""
 from bms.domain.reporting.models import (
+    BusinessUnitRevenueReport,
+    BusinessUnitRevenueRow,
     CurrencyTotals,
     InvoiceReport,
     InvoiceReportRow,
@@ -16,6 +18,8 @@ from bms.domain.reporting.models import (
     TrialBalanceReport,
 )
 from bms.domain.reporting.schemas import (
+    BusinessUnitRevenueReportSchema,
+    BusinessUnitRevenueRowSchema,
     InvoiceReportSchema,
     LedgerReportSchema,
     ProfitAndLossReportSchema,
@@ -29,6 +33,10 @@ from bms.domain.reporting.service import ReportingError, ReportingService
 
 __all__ = [
     "CurrencyTotals",
+    "BusinessUnitRevenueReport",
+    "BusinessUnitRevenueReportSchema",
+    "BusinessUnitRevenueRow",
+    "BusinessUnitRevenueRowSchema",
     "InvoiceReport",
     "InvoiceReportRow",
     "InvoiceReportSchema",

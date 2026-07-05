@@ -17,6 +17,7 @@ class ItemSchema(BaseModel):
     sku: NonEmptyStr
     name: NonEmptyStr
     active: StrictBool = True
+    business_unit: NonEmptyStr = "retail"
 
     def to_item(self) -> Item:
         return Item(
@@ -24,6 +25,7 @@ class ItemSchema(BaseModel):
             sku=self.sku,
             name=self.name,
             active=self.active,
+            business_unit=self.business_unit,
         )
 
 

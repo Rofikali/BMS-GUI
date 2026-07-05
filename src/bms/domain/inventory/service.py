@@ -50,6 +50,7 @@ class InventoryService:
                 "sku": item.sku,
                 "name": item.name,
                 "active": item.active,
+                "business_unit": item.business_unit,
                 "created_at": created_at,
                 "actor_id": actor_id,
                 "correlation_id": correlation_id,
@@ -64,13 +65,13 @@ class InventoryService:
             item.item_id,
             correlation_id,
             occurred_at=created_at,
-            details={"sku": item.sku, "name": item.name, "active": item.active},
+            details={"sku": item.sku, "name": item.name, "active": item.active, "business_unit": item.business_unit},
             idempotency_key=f"audit_item_registered_{item.item_id}",
         )
         self.store.append_business_event(
             "inventory.item_registered.v1",
             actor_id,
-            {"item_id": item.item_id, "sku": item.sku, "name": item.name, "active": item.active},
+            {"item_id": item.item_id, "sku": item.sku, "name": item.name, "active": item.active, "business_unit": item.business_unit},
             correlation_id=correlation_id,
             occurred_at=created_at,
             idempotency_key=f"event_item_registered_{item.item_id}",
@@ -91,13 +92,16 @@ class InventoryService:
             sku = payload.get("sku")
             name = payload.get("name")
             active = payload.get("active")
+            business_unit = payload.get("business_unit", "retail")
             if not isinstance(item_id, str) or not isinstance(sku, str) or not isinstance(name, str):
                 raise InventoryError("stored item payload has invalid identity fields")
+            if not isinstance(business_unit, str) or not business_unit:
+                raise InventoryError("stored item payload business_unit field is invalid")
             if isinstance(active, bool):
                 item_active = active
             else:
                 raise InventoryError("stored item payload active field is not a boolean")
-            items[item_id] = Item(item_id=item_id, sku=sku, name=name, active=item_active)
+            items[item_id] = Item(item_id=item_id, sku=sku, name=name, active=item_active, business_unit=business_unit)
         return dict(sorted(items.items()))
 
     def get_item(self, item_id: str) -> Item | None:

@@ -45,7 +45,13 @@ class CommandSchemaTests(unittest.TestCase):
 
     def test_inventory_schemas_convert_item_and_stock_movement_payloads(self) -> None:
         item = ItemSchema.model_validate(
-            {"item_id": "ITEM-1", "sku": "SKU-1", "name": "Test Item", "active": True}
+            {
+                "item_id": "ITEM-1",
+                "sku": "SKU-1",
+                "name": "Test Item",
+                "active": True,
+                "business_unit": "grocery",
+            }
         ).to_item()
         movement = validate_stock_movement_command_payload(
             {
@@ -63,6 +69,7 @@ class CommandSchemaTests(unittest.TestCase):
         )
 
         self.assertEqual(item.sku, "SKU-1")
+        self.assertEqual(item.business_unit, "grocery")
         self.assertEqual(movement.movement_type, StockMovementType.STOCK_OUT)
         self.assertEqual(movement.quantity_delta, -2)
 

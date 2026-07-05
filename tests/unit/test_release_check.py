@@ -20,6 +20,7 @@ class ReleaseCheckTests(unittest.TestCase):
             self.assertEqual(result.refundable_remaining_minor, 50000)
             self.assertEqual(result.stock_on_hand, 4)
             self.assertEqual(result.tax_payable_minor, 9000)
+            self.assertEqual(result.business_unit_net_revenue_minor, 50000)
             self.assertTrue(result.trial_balance_balanced)
             self.assertTrue(result.restored_trial_balance_balanced)
 

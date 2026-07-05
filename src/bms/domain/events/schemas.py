@@ -29,6 +29,7 @@ class InventoryItemRegisteredV1(_BusinessEventSchema):
     sku: str
     name: str
     active: bool
+    business_unit: str = "retail"
 
 
 class InventoryStockMovedV1(_BusinessEventSchema):

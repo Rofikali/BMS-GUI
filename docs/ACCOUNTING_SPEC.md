@@ -76,6 +76,18 @@ Required MVP accounts:
 - Cost of Goods Sold
 - Inventory Adjustment Expense
 
+Ledger accounts are financial control accounts. Operational detail such as item,
+category, branch, or business unit belongs in subledgers and reporting
+dimensions. For example, use `1200 Inventory` as the inventory control account
+and track rice, sugar, computer accessories, or grocery/computer-shop segments
+through inventory records and report dimensions. Do not create a new general
+ledger account for every stock item unless an accounting policy explicitly
+requires it.
+
+MVP reporting supports a `business_unit` dimension on inventory items and sale
+lines so management can compare revenue by operating segment without weakening
+the chart of accounts.
+
 ---
 
 # 5. Sales Posting

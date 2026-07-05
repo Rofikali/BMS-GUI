@@ -22,6 +22,10 @@ class DemoDataTests(unittest.TestCase):
             self.assertTrue(result.trial_balance_balanced)
             self.assertEqual(facade.invoice_report("FY2026-05")["totals"][0]["total_minor"], 174640)
             self.assertEqual(facade.refund_report("FY2026-05")["totals"][0]["total_minor"], 21240)
+            self.assertEqual(
+                facade.business_unit_revenue_report("FY2026-05")["rows"][0]["business_unit"],
+                "grocery",
+            )
             self.assertTrue(facade.trial_balance_report("FY2026-05")["is_balanced"])
 
     def test_seed_demo_data_refuses_non_empty_target(self) -> None:

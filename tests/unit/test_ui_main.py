@@ -67,11 +67,15 @@ class UiMainTests(unittest.TestCase):
             self.assertEqual(window.report_expense_label.text(), "0")
             self.assertEqual(window.report_net_income_label.text(), "50000")
             self.assertEqual(window.stock_table.rowCount(), 1)
-            self.assertEqual(window.stock_table.item(0, 3).text(), "4")
+            self.assertEqual(window.stock_table.item(0, 3).text(), "retail")
+            self.assertEqual(window.stock_table.item(0, 4).text(), "4")
             self.assertEqual(window.invoice_table.rowCount(), 1)
             self.assertEqual(window.refund_table.rowCount(), 1)
             self.assertEqual(window.refund_availability_table.rowCount(), 1)
             self.assertEqual(window.refund_availability_table.item(0, 5).text(), "1")
+            self.assertEqual(window.business_unit_revenue_table.rowCount(), 1)
+            self.assertEqual(window.business_unit_revenue_table.item(0, 0).text(), "retail")
+            self.assertEqual(window.business_unit_revenue_table.item(0, 3).text(), "50000")
             self.assertTrue(Path(window.backup_path_label.text()).exists())
             self.assertEqual(
                 window.status_label.text(),
@@ -124,6 +128,7 @@ class UiMainTests(unittest.TestCase):
         window.currency_input.setText("usd")
         window.invoice_payment_method_input.setCurrentText("card")
         window.refund_reason_input.setText("damaged box")
+        window.item_business_unit_input.setText("computer_shop")
 
         window.create_invoice()
         window.create_refund()
@@ -133,6 +138,7 @@ class UiMainTests(unittest.TestCase):
         self.assertEqual(facade.created_invoice["period_id"], "FY2026-06")
         self.assertEqual(facade.created_invoice["currency"], "USD")
         self.assertEqual(facade.created_invoice["payment_method"], "card")
+        self.assertEqual(facade.created_invoice["lines"][0]["description"], "New Item")
         self.assertEqual(facade.created_refund["period_id"], "FY2026-06")
         self.assertEqual(facade.created_refund["currency"], "USD")
         self.assertEqual(facade.created_refund["reason"], "damaged box")
@@ -178,6 +184,7 @@ class UiMainTests(unittest.TestCase):
                     "item_id": "ITEM-SEL",
                     "sku": "SKU-SEL",
                     "name": "Selected Item",
+                    "business_unit": "grocery",
                     "quantity_on_hand": 3,
                     "low_stock": False,
                 }
@@ -189,6 +196,7 @@ class UiMainTests(unittest.TestCase):
         self.assertEqual(window.invoice_item_id_input.text(), "ITEM-SEL")
         self.assertEqual(window.refund_item_id_input.text(), "ITEM-SEL")
         self.assertEqual(window.item_name_input.text(), "Selected Item")
+        self.assertEqual(window.item_business_unit_input.text(), "grocery")
 
         window.invoice_table.setCurrentCell(0, 0)
         self.assertEqual(window.refund_invoice_id_input.text(), "INV-SEL")
@@ -227,6 +235,13 @@ class UiMainTests(unittest.TestCase):
         self.assertFalse(window.create_invoice_button.isEnabled())
         self.assertIn("Item ID", window.create_invoice_button.toolTip())
         self.assertTrue(window.register_item_button.isEnabled())
+
+        window.item_business_unit_input.clear()
+
+        self.assertFalse(window.register_item_button.isEnabled())
+        self.assertIn("Business unit", window.register_item_button.toolTip())
+
+        window.item_business_unit_input.setText("retail")
 
         window.invoice_item_id_input.setText("ITEM-READY")
 
@@ -401,6 +416,18 @@ class _CapturingFacade:
 
     def stock_report(self, *, low_stock_threshold: int = 0):
         return {"rows": self.stock_rows}
+
+    def business_unit_revenue_report(self, period_id, *, currency: str = "INR"):
+        return {
+            "rows": [
+                {
+                    "business_unit": "retail",
+                    "invoice_subtotal_minor": 100000,
+                    "refund_subtotal_minor": 50000,
+                    "net_revenue_minor": 50000,
+                }
+            ]
+        }
 
     def ledger_report(self, period_id):
         return {"rows": []}

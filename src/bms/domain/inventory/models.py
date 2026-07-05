@@ -16,6 +16,7 @@ class Item:
     sku: str
     name: str
     active: bool = True
+    business_unit: str = "retail"
 
 
 @dataclass(frozen=True)

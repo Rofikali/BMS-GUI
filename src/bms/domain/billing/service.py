@@ -136,6 +136,8 @@ class BillingService:
         )
         for index, line in enumerate(command.lines, start=1):
             line_subtotal = line.quantity * line.unit_price_minor
+            item = self.inventory.get_item(line.item_id)
+            business_unit = item.business_unit if item is not None else "retail"
             self.store.append_record(
                 self.store.invoice_lines,
                 "billing.invoice_line",
@@ -147,6 +149,7 @@ class BillingService:
                     "line_no": index,
                     "item_id": line.item_id,
                     "description": line.description,
+                    "business_unit": business_unit,
                     "quantity": line.quantity,
                     "unit_price_minor": line.unit_price_minor,
                     "line_subtotal_minor": line_subtotal,
@@ -307,6 +310,8 @@ class BillingService:
             created_at=command.timestamp,
         )
         for index, line in enumerate(command.lines, start=1):
+            item = self.inventory.get_item(line.item_id)
+            business_unit = item.business_unit if item is not None else "retail"
             self.store.append_record(
                 self.store.refund_lines,
                 "billing.refund_line",
@@ -318,6 +323,7 @@ class BillingService:
                     "line_no": index,
                     "item_id": line.item_id,
                     "description": line.description,
+                    "business_unit": business_unit,
                     "quantity": line.quantity,
                     "unit_price_minor": line.unit_price_minor,
                     "line_subtotal_minor": line.quantity * line.unit_price_minor,
