@@ -65,6 +65,7 @@ class CommandSchemaTests(unittest.TestCase):
                 "source_module": "billing",
                 "source_document_id": "INV-SCHEMA-1",
                 "correlation_id": "corr_INV_SCHEMA_1",
+                "unit_cost_minor": 30000,
             }
         )
 
@@ -72,6 +73,7 @@ class CommandSchemaTests(unittest.TestCase):
         self.assertEqual(item.business_unit, "grocery")
         self.assertEqual(movement.movement_type, StockMovementType.STOCK_OUT)
         self.assertEqual(movement.quantity_delta, -2)
+        self.assertEqual(movement.unit_cost_minor, 30000)
 
     def test_inventory_schema_rejects_non_boolean_item_status(self) -> None:
         with self.assertRaises(ValidationError):

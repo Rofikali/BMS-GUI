@@ -14,13 +14,34 @@ class InventoryServiceTests(unittest.TestCase):
             service = InventoryService(initialize_data_root(Path(temp_dir)))
             _register_item(service)
 
-            result = service.commit_movement(_movement("MOV-1", quantity_delta=10))
+            result = service.commit_movement(_movement("MOV-1", quantity_delta=10, unit_cost_minor=25000))
             service.commit_movement(_movement("MOV-2", quantity_delta=-3, movement_type=StockMovementType.STOCK_OUT))
 
             self.assertEqual(result.quantity_on_hand, 10)
+            self.assertEqual(result.value_delta_minor, 250000)
+            self.assertEqual(result.inventory_value_after_minor, 250000)
             self.assertEqual(service.get_stock_on_hand("ITEM-1"), 7)
+            self.assertEqual(service.get_inventory_value_minor("ITEM-1"), 175000)
+            self.assertEqual(service.get_weighted_average_unit_cost_minor("ITEM-1"), 25000)
             self.assertEqual(service.get_all_stock_on_hand(), {"ITEM-1": 7})
             self.assertEqual(service.store.core.verify_file(service.store.stock_movements), 2)
+
+    def test_stock_movement_recalculates_weighted_average_cost(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            service = InventoryService(initialize_data_root(Path(temp_dir)))
+            _register_item(service)
+
+            service.commit_movement(_movement("MOV-COST-1", quantity_delta=2, unit_cost_minor=30000))
+            service.commit_movement(_movement("MOV-COST-2", quantity_delta=3, unit_cost_minor=50000))
+            out = service.commit_movement(
+                _movement("MOV-COST-3", quantity_delta=-2, movement_type=StockMovementType.STOCK_OUT)
+            )
+
+            self.assertEqual(service.get_stock_on_hand("ITEM-1"), 3)
+            self.assertEqual(service.get_weighted_average_unit_cost_minor("ITEM-1"), 42000)
+            self.assertEqual(out.unit_cost_minor, 42000)
+            self.assertEqual(out.value_delta_minor, -84000)
+            self.assertEqual(service.get_inventory_value_minor("ITEM-1"), 126000)
 
     def test_stock_on_hand_survives_service_restart(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -161,6 +182,7 @@ def _movement(
     movement_type: StockMovementType = StockMovementType.STOCK_IN,
     reason: str = "opening stock",
     source_document_id: str = "STK-1001",
+    unit_cost_minor: int = 0,
 ) -> StockMovementCommand:
     return StockMovementCommand(
         movement_id=movement_id,
@@ -173,6 +195,7 @@ def _movement(
         source_module="inventory",
         source_document_id=source_document_id,
         correlation_id=f"corr_{movement_id}",
+        unit_cost_minor=unit_cost_minor,
     )
 
 

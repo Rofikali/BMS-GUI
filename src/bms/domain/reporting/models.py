@@ -100,6 +100,8 @@ class StockReportRow:
     business_unit: str
     active: bool
     quantity_on_hand: int
+    average_unit_cost_minor: int
+    inventory_value_minor: int
     low_stock: bool
 
 
@@ -134,7 +136,10 @@ class ProfitAndLossReport:
     revenue_minor: int
     contra_revenue_minor: int
     net_revenue_minor: int
+    cogs_minor: int
+    gross_profit_minor: int
     expense_minor: int
+    operating_expense_minor: int
     net_income_minor: int
 
 

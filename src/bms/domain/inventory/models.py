@@ -31,6 +31,7 @@ class StockMovementCommand:
     source_module: str
     source_document_id: str
     correlation_id: str
+    unit_cost_minor: int = 0
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,9 @@ class StockMovementResult:
     item_id: str
     quantity_delta: int
     quantity_on_hand: int
+    unit_cost_minor: int = 0
+    value_delta_minor: int = 0
+    inventory_value_after_minor: int = 0
 
 
 @dataclass(frozen=True)

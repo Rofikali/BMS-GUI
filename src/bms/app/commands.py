@@ -107,6 +107,9 @@ class StockMovementOutputSchema(_FacadeOutputSchema):
     item_id: str
     quantity_delta: int
     quantity_on_hand: int
+    unit_cost_minor: int = Field(ge=0)
+    value_delta_minor: int
+    inventory_value_after_minor: int
 
 
 class InvoiceOutputSchema(_FacadeOutputSchema):

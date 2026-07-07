@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from uuid import uuid4
 
 from bms.domain.accounting import JournalLine, PostJournalCommand
@@ -14,6 +15,16 @@ class BillingError(ValueError):
     pass
 
 
+@dataclass(frozen=True)
+class SalesPostingAccounts:
+    cash: str = "1000"
+    inventory: str = "1200"
+    sales_revenue: str = "4000"
+    sales_returns: str = "4100"
+    cost_of_goods_sold: str = "5000"
+    output_tax_payable: str = "2100"
+
+
 class BillingService:
     def __init__(
         self,
@@ -22,11 +33,13 @@ class BillingService:
         accounting: AccountingPort,
         *,
         tax_rate_basis_points: int = 1800,
+        posting_accounts: SalesPostingAccounts | None = None,
     ) -> None:
         self.store = store
         self.inventory = inventory
         self.accounting = accounting
         self.tax_rate_basis_points = tax_rate_basis_points
+        self.posting_accounts = posting_accounts or SalesPostingAccounts()
 
     def create_invoice(self, command: CreateInvoiceCommand) -> InvoiceResult:
         self._validate_command(command)
@@ -41,14 +54,47 @@ class BillingService:
         journal_id = f"jrn_{command.invoice_id}"
 
         self._validate_stock_available(command)
+        cogs_by_line = tuple(
+            line.quantity * self.inventory.get_weighted_average_unit_cost_minor(line.item_id)
+            for line in command.lines
+        )
+        cogs_total_minor = sum(cogs_by_line)
 
+        accounts = self.posting_accounts
         journal_lines = [
-            JournalLine("1000", debit_minor=total_minor, currency=command.currency, memo=f"Invoice {command.invoice_id}"),
-            JournalLine("4000", credit_minor=subtotal_minor, currency=command.currency, memo=f"Invoice {command.invoice_id}"),
+            JournalLine(accounts.cash, debit_minor=total_minor, currency=command.currency, memo=f"Invoice {command.invoice_id}"),
+            JournalLine(
+                accounts.sales_revenue,
+                credit_minor=subtotal_minor,
+                currency=command.currency,
+                memo=f"Invoice {command.invoice_id}",
+            ),
         ]
         if tax_minor:
             journal_lines.append(
-                JournalLine("2100", credit_minor=tax_minor, currency=command.currency, memo=f"Invoice {command.invoice_id} tax")
+                JournalLine(
+                    accounts.output_tax_payable,
+                    credit_minor=tax_minor,
+                    currency=command.currency,
+                    memo=f"Invoice {command.invoice_id} tax",
+                )
+            )
+        if cogs_total_minor:
+            journal_lines.extend(
+                [
+                    JournalLine(
+                        accounts.cost_of_goods_sold,
+                        debit_minor=cogs_total_minor,
+                        currency=command.currency,
+                        memo=f"Invoice {command.invoice_id} cost",
+                    ),
+                    JournalLine(
+                        accounts.inventory,
+                        credit_minor=cogs_total_minor,
+                        currency=command.currency,
+                        memo=f"Invoice {command.invoice_id} inventory relief",
+                    ),
+                ]
             )
 
         parent_transaction_id = f"txn_billing_create_invoice_{command.invoice_id}_{uuid4().hex}"
@@ -75,6 +121,7 @@ class BillingService:
                 "subtotal_minor": subtotal_minor,
                 "tax_minor": tax_minor,
                 "total_minor": total_minor,
+                "cogs_minor": cogs_total_minor,
                 "currency": command.currency,
             },
         )
@@ -94,6 +141,7 @@ class BillingService:
         )
 
         for index, line in enumerate(command.lines, start=1):
+            cogs_unit_cost_minor = self.inventory.get_weighted_average_unit_cost_minor(line.item_id)
             self.inventory.commit_movement(
                 StockMovementCommand(
                     movement_id=movement_ids[index - 1],
@@ -106,6 +154,7 @@ class BillingService:
                     source_module="billing",
                     source_document_id=command.invoice_id,
                     correlation_id=command.correlation_id,
+                    unit_cost_minor=cogs_unit_cost_minor,
                 )
             )
 
@@ -138,6 +187,8 @@ class BillingService:
             line_subtotal = line.quantity * line.unit_price_minor
             item = self.inventory.get_item(line.item_id)
             business_unit = item.business_unit if item is not None else "retail"
+            cogs_minor = cogs_by_line[index - 1]
+            cogs_unit_cost_minor = cogs_minor // line.quantity
             self.store.append_record(
                 self.store.invoice_lines,
                 "billing.invoice_line",
@@ -153,6 +204,8 @@ class BillingService:
                     "quantity": line.quantity,
                     "unit_price_minor": line.unit_price_minor,
                     "line_subtotal_minor": line_subtotal,
+                    "cogs_unit_cost_minor": cogs_unit_cost_minor,
+                    "cogs_minor": cogs_minor,
                     "currency": command.currency,
                 },
                 record_id=f"ivl_{command.invoice_id}_{index}",
@@ -215,19 +268,49 @@ class BillingService:
         subtotal_minor = sum(line.quantity * line.unit_price_minor for line in command.lines)
         tax_minor = _calculate_tax(subtotal_minor, self.tax_rate_basis_points)
         total_minor = subtotal_minor + tax_minor
+        cogs_by_line = self._refund_cogs_by_line(command)
+        cogs_restored_minor = sum(cogs_by_line)
         movement_ids = tuple(
             f"mov_refund_{command.refund_id}_{index}"
             for index, line in enumerate(command.lines, start=1)
             if line.restock
         )
         journal_id = f"jrn_refund_{command.refund_id}"
+        accounts = self.posting_accounts
         journal_lines = [
-            JournalLine("4000", debit_minor=subtotal_minor, currency=command.currency, memo=f"Refund {command.refund_id}"),
-            JournalLine("1000", credit_minor=total_minor, currency=command.currency, memo=f"Refund {command.refund_id}"),
+            JournalLine(
+                accounts.sales_returns,
+                debit_minor=subtotal_minor,
+                currency=command.currency,
+                memo=f"Refund {command.refund_id}",
+            ),
+            JournalLine(accounts.cash, credit_minor=total_minor, currency=command.currency, memo=f"Refund {command.refund_id}"),
         ]
         if tax_minor:
             journal_lines.append(
-                JournalLine("2100", debit_minor=tax_minor, currency=command.currency, memo=f"Refund {command.refund_id} tax")
+                JournalLine(
+                    accounts.output_tax_payable,
+                    debit_minor=tax_minor,
+                    currency=command.currency,
+                    memo=f"Refund {command.refund_id} tax",
+                )
+            )
+        if cogs_restored_minor:
+            journal_lines.extend(
+                [
+                    JournalLine(
+                        accounts.inventory,
+                        debit_minor=cogs_restored_minor,
+                        currency=command.currency,
+                        memo=f"Refund {command.refund_id} inventory return",
+                    ),
+                    JournalLine(
+                        accounts.cost_of_goods_sold,
+                        credit_minor=cogs_restored_minor,
+                        currency=command.currency,
+                        memo=f"Refund {command.refund_id} cost reversal",
+                    ),
+                ]
             )
 
         parent_transaction_id = f"txn_billing_create_refund_{command.refund_id}_{uuid4().hex}"
@@ -246,6 +329,7 @@ class BillingService:
                 "subtotal_minor": subtotal_minor,
                 "tax_minor": tax_minor,
                 "total_minor": total_minor,
+                "cogs_restored_minor": cogs_restored_minor,
                 "currency": command.currency,
             },
         )
@@ -264,11 +348,13 @@ class BillingService:
         )
 
         movement_index = 0
-        for line in command.lines:
+        for line_index, line in enumerate(command.lines, start=1):
             if not line.restock:
                 continue
             movement_id = movement_ids[movement_index]
             movement_index += 1
+            cogs_minor = cogs_by_line[line_index - 1]
+            cogs_unit_cost_minor = cogs_minor // line.quantity
             self.inventory.commit_movement(
                 StockMovementCommand(
                     movement_id=movement_id,
@@ -281,6 +367,7 @@ class BillingService:
                     source_module="billing",
                     source_document_id=command.refund_id,
                     correlation_id=command.correlation_id,
+                    unit_cost_minor=cogs_unit_cost_minor,
                 )
             )
 
@@ -301,6 +388,7 @@ class BillingService:
                 "subtotal_minor": subtotal_minor,
                 "tax_minor": tax_minor,
                 "total_minor": total_minor,
+                "cogs_restored_minor": cogs_restored_minor,
                 "journal_id": journal_id,
                 "movement_ids": list(movement_ids),
                 "correlation_id": command.correlation_id,
@@ -312,6 +400,8 @@ class BillingService:
         for index, line in enumerate(command.lines, start=1):
             item = self.inventory.get_item(line.item_id)
             business_unit = item.business_unit if item is not None else "retail"
+            cogs_minor = cogs_by_line[index - 1]
+            cogs_unit_cost_minor = cogs_minor // line.quantity
             self.store.append_record(
                 self.store.refund_lines,
                 "billing.refund_line",
@@ -327,6 +417,8 @@ class BillingService:
                     "quantity": line.quantity,
                     "unit_price_minor": line.unit_price_minor,
                     "line_subtotal_minor": line.quantity * line.unit_price_minor,
+                    "cogs_unit_cost_minor": cogs_unit_cost_minor,
+                    "cogs_minor": cogs_minor,
                     "restock": line.restock,
                     "currency": command.currency,
                 },
@@ -345,6 +437,7 @@ class BillingService:
                 "subtotal_minor": subtotal_minor,
                 "tax_minor": tax_minor,
                 "total_minor": total_minor,
+                "cogs_restored_minor": cogs_restored_minor,
                 "line_count": len(command.lines),
             },
             idempotency_key=f"audit_refund_created_{command.refund_id}",
@@ -359,6 +452,7 @@ class BillingService:
                 "subtotal_minor": subtotal_minor,
                 "tax_minor": tax_minor,
                 "total_minor": total_minor,
+                "cogs_restored_minor": cogs_restored_minor,
                 "line_count": len(command.lines),
             },
             correlation_id=command.correlation_id,
@@ -484,6 +578,32 @@ class BillingService:
             quantities[key] = quantities.get(key, 0) + _required_int(payload, "quantity")
         return quantities
 
+    def _refund_cogs_by_line(self, command: CreateRefundCommand) -> tuple[int, ...]:
+        cogs_unit_cost_by_line = self._original_invoice_cogs_unit_costs(command.original_invoice_id)
+        return tuple(
+            line.quantity * cogs_unit_cost_by_line.get((line.item_id, line.unit_price_minor), 0)
+            if line.restock
+            else 0
+            for line in command.lines
+        )
+
+    def _original_invoice_cogs_unit_costs(self, invoice_id: str) -> dict[tuple[str, int], int]:
+        costs_by_line: dict[tuple[str, int], dict[str, int]] = {}
+        for payload in self.store.read_payloads(self.store.invoice_lines):
+            if payload.get("invoice_id") != invoice_id:
+                continue
+            key = (_required_str(payload, "item_id"), _required_int(payload, "unit_price_minor"))
+            quantity = _required_int(payload, "quantity")
+            cogs_minor = _optional_int(payload, "cogs_minor")
+            line_costs = costs_by_line.setdefault(key, {"quantity": 0, "cogs_minor": 0})
+            line_costs["quantity"] += quantity
+            line_costs["cogs_minor"] += cogs_minor
+        return {
+            key: values["cogs_minor"] // values["quantity"]
+            for key, values in costs_by_line.items()
+            if values["quantity"] > 0
+        }
+
     def _validate_stock_available(self, command: CreateInvoiceCommand) -> None:
         required_by_item: dict[str, int] = {}
         for line in command.lines:
@@ -512,6 +632,13 @@ def _required_str(payload: dict[str, object], key: str) -> str:
 
 def _required_int(payload: dict[str, object], key: str) -> int:
     value = payload.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise BillingError(f"stored billing payload field {key} is not an integer")
+    return value
+
+
+def _optional_int(payload: dict[str, object], key: str) -> int:
+    value = payload.get(key, 0)
     if isinstance(value, bool) or not isinstance(value, int):
         raise BillingError(f"stored billing payload field {key} is not an integer")
     return value

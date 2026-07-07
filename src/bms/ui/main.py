@@ -129,11 +129,13 @@ def build_main_window_class():
             self.item_name_input = qt.QLineEdit("New Item")
             self.item_business_unit_input = qt.QLineEdit("retail")
             self.opening_stock_input = _spin_box(qt, 0, 1_000_000, 5)
+            self.opening_unit_cost_input = _spin_box(qt, 0, 1_000_000_000, 30000)
             form.addRow("Item ID", self.item_id_input)
             form.addRow("SKU", self.sku_input)
             form.addRow("Name", self.item_name_input)
             form.addRow("Business unit", self.item_business_unit_input)
             form.addRow("Opening stock", self.opening_stock_input)
+            form.addRow("Opening unit cost minor", self.opening_unit_cost_input)
 
             actions = qt.QHBoxLayout()
             self.register_item_button = qt.QPushButton("Register")
@@ -148,7 +150,17 @@ def build_main_window_class():
             stock_group = qt.QGroupBox("Stock")
             stock_layout = qt.QVBoxLayout(stock_group)
             self.stock_table = _table(
-                qt, ["Item", "SKU", "Name", "Business unit", "On hand", "Low stock"]
+                qt,
+                [
+                    "Item",
+                    "SKU",
+                    "Name",
+                    "Business unit",
+                    "On hand",
+                    "Avg cost",
+                    "Value",
+                    "Low stock",
+                ],
             )
             self.stock_table.itemSelectionChanged.connect(self._apply_stock_selection)
             stock_layout.addWidget(self.stock_table)
@@ -265,6 +277,8 @@ def build_main_window_class():
             self.report_tax_payable_label = qt.QLabel("0")
             self.report_trial_balance_label = qt.QLabel("Unknown")
             self.report_net_revenue_label = qt.QLabel("0")
+            self.report_cogs_label = qt.QLabel("0")
+            self.report_gross_profit_label = qt.QLabel("0")
             self.report_expense_label = qt.QLabel("0")
             self.report_net_income_label = qt.QLabel("0")
             summary.addRow("Invoice total", self.report_invoice_total_label)
@@ -275,6 +289,8 @@ def build_main_window_class():
             summary.addRow("Tax payable", self.report_tax_payable_label)
             summary.addRow("Trial balance", self.report_trial_balance_label)
             summary.addRow("Net revenue", self.report_net_revenue_label)
+            summary.addRow("COGS", self.report_cogs_label)
+            summary.addRow("Gross profit", self.report_gross_profit_label)
             summary.addRow("Expense", self.report_expense_label)
             summary.addRow("Net income", self.report_net_income_label)
             self.close_period_button = qt.QPushButton("Close Period")
@@ -435,6 +451,7 @@ def build_main_window_class():
                             "source_module": "inventory",
                             "source_document_id": f"OPEN-{item_id}",
                             "correlation_id": f"corr_open_{item_id}",
+                            "unit_cost_minor": self.opening_unit_cost_input.value(),
                         }
                     )
                 self.invoice_item_id_input.setText(item_id)
@@ -776,7 +793,13 @@ def build_main_window_class():
             self.report_net_revenue_label.setText(
                 str(profit_and_loss["net_revenue_minor"])
             )
-            self.report_expense_label.setText(str(profit_and_loss["expense_minor"]))
+            self.report_cogs_label.setText(str(profit_and_loss["cogs_minor"]))
+            self.report_gross_profit_label.setText(
+                str(profit_and_loss["gross_profit_minor"])
+            )
+            self.report_expense_label.setText(
+                str(profit_and_loss["operating_expense_minor"])
+            )
             self.report_net_income_label.setText(
                 str(profit_and_loss["net_income_minor"])
             )
@@ -791,6 +814,8 @@ def build_main_window_class():
                         row["name"],
                         row["business_unit"],
                         str(row["quantity_on_hand"]),
+                        str(row["average_unit_cost_minor"]),
+                        str(row["inventory_value_minor"]),
                         "Yes" if row["low_stock"] else "No",
                     ]
                     for row in stock_report["rows"]

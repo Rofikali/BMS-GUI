@@ -62,7 +62,7 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
             self.assertEqual(business_unit_revenue["rows"][0]["business_unit"], "retail")
             self.assertEqual(business_unit_revenue["rows"][0]["net_revenue_minor"], 50000)
             self.assertEqual(stock_report["rows"][0]["quantity_on_hand"], 4)
-            self.assertEqual({row["account_code"] for row in ledger_report["rows"]}, {"1000", "2100", "4000"})
+            self.assertEqual({row["account_code"] for row in ledger_report["rows"]}, {"1000", "2100", "4000", "4100"})
             self.assertEqual(profit_and_loss["net_revenue_minor"], 50000)
             self.assertEqual(profit_and_loss["net_income_minor"], 50000)
             self.assertEqual(tax_report["invoice_tax_collected_minor"], 18000)

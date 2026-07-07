@@ -131,6 +131,8 @@ class StockReportRowSchema(_ReportSchema):
     business_unit: str
     active: bool
     quantity_on_hand: int
+    average_unit_cost_minor: int = Field(ge=0)
+    inventory_value_minor: int
     low_stock: bool
 
 
@@ -169,7 +171,10 @@ class ProfitAndLossReportSchema(_ReportSchema):
     revenue_minor: int = Field(ge=0)
     contra_revenue_minor: int = Field(ge=0)
     net_revenue_minor: int
+    cogs_minor: int = Field(ge=0)
+    gross_profit_minor: int
     expense_minor: int = Field(ge=0)
+    operating_expense_minor: int = Field(ge=0)
     net_income_minor: int
 
     @classmethod

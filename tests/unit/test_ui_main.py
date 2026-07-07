@@ -64,11 +64,15 @@ class UiMainTests(unittest.TestCase):
             self.assertEqual(window.report_refundable_remaining_label.text(), "50000")
             self.assertEqual(window.report_tax_payable_label.text(), "9000")
             self.assertEqual(window.report_net_revenue_label.text(), "50000")
+            self.assertEqual(window.report_cogs_label.text(), "30000")
+            self.assertEqual(window.report_gross_profit_label.text(), "20000")
             self.assertEqual(window.report_expense_label.text(), "0")
-            self.assertEqual(window.report_net_income_label.text(), "50000")
+            self.assertEqual(window.report_net_income_label.text(), "20000")
             self.assertEqual(window.stock_table.rowCount(), 1)
             self.assertEqual(window.stock_table.item(0, 3).text(), "retail")
             self.assertEqual(window.stock_table.item(0, 4).text(), "4")
+            self.assertEqual(window.stock_table.item(0, 5).text(), "30000")
+            self.assertEqual(window.stock_table.item(0, 6).text(), "120000")
             self.assertEqual(window.invoice_table.rowCount(), 1)
             self.assertEqual(window.refund_table.rowCount(), 1)
             self.assertEqual(window.refund_availability_table.rowCount(), 1)
@@ -186,6 +190,8 @@ class UiMainTests(unittest.TestCase):
                     "name": "Selected Item",
                     "business_unit": "grocery",
                     "quantity_on_hand": 3,
+                    "average_unit_cost_minor": 25000,
+                    "inventory_value_minor": 75000,
                     "low_stock": False,
                 }
             ],
@@ -439,7 +445,10 @@ class _CapturingFacade:
             "revenue_minor": 100000,
             "contra_revenue_minor": 50000,
             "net_revenue_minor": 50000,
+            "cogs_minor": 0,
+            "gross_profit_minor": 50000,
             "expense_minor": 0,
+            "operating_expense_minor": 0,
             "net_income_minor": 50000,
         }
 

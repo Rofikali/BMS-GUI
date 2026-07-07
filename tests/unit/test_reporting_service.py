@@ -80,13 +80,16 @@ class ReportingServiceTests(unittest.TestCase):
             self.assertFalse(stock_report.rows[0].low_stock)
             self.assertEqual(
                 {row.account_code for row in ledger_report.rows},
-                {"1000", "2100", "4000"},
+                {"1000", "1200", "2100", "4000", "4100", "5000"},
             )
             self.assertEqual(profit_and_loss_report.revenue_minor, 100000)
             self.assertEqual(profit_and_loss_report.contra_revenue_minor, 50000)
             self.assertEqual(profit_and_loss_report.net_revenue_minor, 50000)
-            self.assertEqual(profit_and_loss_report.expense_minor, 0)
-            self.assertEqual(profit_and_loss_report.net_income_minor, 50000)
+            self.assertEqual(profit_and_loss_report.cogs_minor, 30000)
+            self.assertEqual(profit_and_loss_report.gross_profit_minor, 20000)
+            self.assertEqual(profit_and_loss_report.expense_minor, 30000)
+            self.assertEqual(profit_and_loss_report.operating_expense_minor, 0)
+            self.assertEqual(profit_and_loss_report.net_income_minor, 20000)
             self.assertEqual(tax_report.invoice_tax_collected_minor, 18000)
             self.assertEqual(tax_report.tax_payable_balance_minor, 9000)
             self.assertTrue(trial_balance_report.is_balanced)
@@ -101,8 +104,11 @@ class ReportingServiceTests(unittest.TestCase):
             self.assertEqual(refund_availability_export["rows"][0]["remaining_quantity"], 1)
             self.assertEqual(stock_export["rows"][0]["quantity_on_hand"], 4)
             self.assertEqual(stock_export["rows"][0]["business_unit"], "grocery")
-            self.assertEqual({row["account_code"] for row in ledger_export["rows"]}, {"1000", "2100", "4000"})
-            self.assertEqual(profit_and_loss_export["net_income_minor"], 50000)
+            self.assertEqual(stock_export["rows"][0]["average_unit_cost_minor"], 30000)
+            self.assertEqual(stock_export["rows"][0]["inventory_value_minor"], 120000)
+            self.assertEqual({row["account_code"] for row in ledger_export["rows"]}, {"1000", "1200", "2100", "4000", "4100", "5000"})
+            self.assertEqual(profit_and_loss_export["gross_profit_minor"], 20000)
+            self.assertEqual(profit_and_loss_export["net_income_minor"], 20000)
             self.assertEqual(tax_export["invoice_tax_collected_minor"], 18000)
             self.assertTrue(trial_balance_export["is_balanced"])
             self.assertEqual(business_unit_revenue_export["rows"][0]["business_unit"], "grocery")
@@ -200,6 +206,7 @@ def _register_and_stock_item(inventory: InventoryService, *, quantity: int) -> N
         reason="opening stock",
         source_document_id="STK-1001",
         correlation_id="corr_stock_in",
+        unit_cost_minor=30000,
     )
 
 

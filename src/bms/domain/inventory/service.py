@@ -113,9 +113,13 @@ class InventoryService:
         self._validate_movement_item(command.item_id)
 
         current_quantity = self.get_stock_on_hand(command.item_id)
+        current_value_minor = self.get_inventory_value_minor(command.item_id)
         next_quantity = current_quantity + command.quantity_delta
         if next_quantity < 0 and not self.allow_negative_stock:
             raise InventoryError(f"movement would make stock negative for item {command.item_id}")
+        unit_cost_minor = self._movement_unit_cost(command, current_quantity, current_value_minor)
+        value_delta_minor = command.quantity_delta * unit_cost_minor
+        inventory_value_after_minor = current_value_minor + value_delta_minor
 
         transaction_id = f"txn_inventory_{command.movement_id}_{uuid4().hex}"
         self.store.core.append_wal_pending(
@@ -129,6 +133,8 @@ class InventoryService:
                 "movement_id": command.movement_id,
                 "item_id": command.item_id,
                 "quantity_delta": command.quantity_delta,
+                "unit_cost_minor": unit_cost_minor,
+                "value_delta_minor": value_delta_minor,
                 "source_document_id": command.source_document_id,
             },
         )
@@ -144,6 +150,9 @@ class InventoryService:
                 "movement_type": command.movement_type.value,
                 "quantity_delta": command.quantity_delta,
                 "quantity_on_hand_after": next_quantity,
+                "unit_cost_minor": unit_cost_minor,
+                "value_delta_minor": value_delta_minor,
+                "inventory_value_after_minor": inventory_value_after_minor,
                 "timestamp": command.timestamp,
                 "actor_id": command.actor_id,
                 "reason": command.reason,
@@ -166,6 +175,9 @@ class InventoryService:
                 "movement_type": command.movement_type.value,
                 "quantity_delta": command.quantity_delta,
                 "quantity_on_hand_after": next_quantity,
+                "unit_cost_minor": unit_cost_minor,
+                "value_delta_minor": value_delta_minor,
+                "inventory_value_after_minor": inventory_value_after_minor,
                 "reason": command.reason,
                 "source_module": command.source_module,
                 "source_document_id": command.source_document_id,
@@ -181,6 +193,9 @@ class InventoryService:
                 "movement_type": command.movement_type.value,
                 "quantity_delta": command.quantity_delta,
                 "quantity_on_hand_after": next_quantity,
+                "unit_cost_minor": unit_cost_minor,
+                "value_delta_minor": value_delta_minor,
+                "inventory_value_after_minor": inventory_value_after_minor,
                 "source_document_id": command.source_document_id,
             },
             correlation_id=command.correlation_id,
@@ -194,7 +209,15 @@ class InventoryService:
             command.actor_id,
             command.correlation_id,
         )
-        return StockMovementResult(command.movement_id, command.item_id, command.quantity_delta, next_quantity)
+        return StockMovementResult(
+            command.movement_id,
+            command.item_id,
+            command.quantity_delta,
+            next_quantity,
+            unit_cost_minor,
+            value_delta_minor,
+            inventory_value_after_minor,
+        )
 
     def adjust_stock(
         self,
@@ -207,6 +230,7 @@ class InventoryService:
         reason: str,
         source_document_id: str,
         correlation_id: str,
+        unit_cost_minor: int = 0,
     ) -> StockMovementResult:
         return self.commit_movement(
             StockMovementCommand(
@@ -220,6 +244,7 @@ class InventoryService:
                 source_module="inventory",
                 source_document_id=source_document_id,
                 correlation_id=correlation_id,
+                unit_cost_minor=unit_cost_minor,
             )
         )
 
@@ -238,6 +263,19 @@ class InventoryService:
                 raise InventoryError("stored stock movement item_id is not a string")
             quantities[item_id] = quantities.get(item_id, 0) + _int_payload(payload, "quantity_delta")
         return dict(sorted(quantities.items()))
+
+    def get_inventory_value_minor(self, item_id: str) -> int:
+        value_minor = 0
+        for payload in self.store.read_payloads(self.store.stock_movements):
+            if payload.get("item_id") == item_id:
+                value_minor += _int_payload(payload, "value_delta_minor")
+        return value_minor
+
+    def get_weighted_average_unit_cost_minor(self, item_id: str) -> int:
+        quantity = self.get_stock_on_hand(item_id)
+        if quantity <= 0:
+            return 0
+        return self.get_inventory_value_minor(item_id) // quantity
 
     def _validate_item(self, item: Item) -> None:
         required = {"item_id": item.item_id, "sku": item.sku, "name": item.name}
@@ -275,6 +313,8 @@ class InventoryService:
             raise InventoryError(f"missing required stock movement field(s): {', '.join(missing)}")
         if command.quantity_delta == 0:
             raise InventoryError("stock movement quantity_delta cannot be zero")
+        if command.unit_cost_minor < 0:
+            raise InventoryError("stock movement unit_cost_minor cannot be negative")
         if command.movement_type == StockMovementType.STOCK_IN and command.quantity_delta < 0:
             raise InventoryError("stock_in movement must increase stock")
         if command.movement_type == StockMovementType.STOCK_OUT and command.quantity_delta > 0:
@@ -284,6 +324,20 @@ class InventoryService:
         for payload in self.store.read_payloads(self.store.stock_movements):
             if payload.get("movement_id") == movement_id:
                 raise InventoryError(f"stock movement {movement_id} is already committed")
+
+    def _movement_unit_cost(
+        self,
+        command: StockMovementCommand,
+        current_quantity: int,
+        current_value_minor: int,
+    ) -> int:
+        if command.quantity_delta > 0:
+            return command.unit_cost_minor
+        if command.unit_cost_minor:
+            return command.unit_cost_minor
+        if current_quantity <= 0:
+            return 0
+        return current_value_minor // current_quantity
 
 
 def _int_payload(payload: dict[str, object], key: str) -> int:

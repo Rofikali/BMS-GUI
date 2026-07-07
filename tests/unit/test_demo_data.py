@@ -26,6 +26,8 @@ class DemoDataTests(unittest.TestCase):
                 facade.business_unit_revenue_report("FY2026-05")["rows"][0]["business_unit"],
                 "grocery",
             )
+            stock_rows = facade.stock_report(low_stock_threshold=5)["rows"]
+            self.assertGreater(sum(row["inventory_value_minor"] for row in stock_rows), 0)
             self.assertTrue(facade.trial_balance_report("FY2026-05")["is_balanced"])
 
     def test_seed_demo_data_refuses_non_empty_target(self) -> None:

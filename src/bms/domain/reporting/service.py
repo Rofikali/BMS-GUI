@@ -290,6 +290,8 @@ class ReportingService:
                 business_unit=item.business_unit,
                 active=item.active,
                 quantity_on_hand=quantities.get(item.item_id, 0),
+                average_unit_cost_minor=inventory.get_weighted_average_unit_cost_minor(item.item_id),
+                inventory_value_minor=inventory.get_inventory_value_minor(item.item_id),
                 low_stock=quantities.get(item.item_id, 0) <= low_stock_threshold,
             )
             for item in inventory.get_items().values()
@@ -326,6 +328,7 @@ class ReportingService:
         revenue_minor = 0
         contra_revenue_minor = 0
         expense_minor = 0
+        cogs_minor = 0
         for balance in balances.values():
             if balance.currency != currency:
                 continue
@@ -333,19 +336,27 @@ class ReportingService:
                 revenue_minor += balance.credit_total_minor
                 contra_revenue_minor += balance.debit_total_minor
             elif balance.account_type.value == "expense":
-                expense_minor += max(
+                net_expense_minor = max(
                     balance.debit_total_minor - balance.credit_total_minor,
                     0,
                 )
+                expense_minor += net_expense_minor
+                if balance.account_code == "5000":
+                    cogs_minor += net_expense_minor
         net_revenue_minor = revenue_minor - contra_revenue_minor
+        operating_expense_minor = expense_minor - cogs_minor
+        gross_profit_minor = net_revenue_minor - cogs_minor
         return ProfitAndLossReport(
             period_id=period_id,
             currency=currency,
             revenue_minor=revenue_minor,
             contra_revenue_minor=contra_revenue_minor,
             net_revenue_minor=net_revenue_minor,
+            cogs_minor=cogs_minor,
+            gross_profit_minor=gross_profit_minor,
             expense_minor=expense_minor,
-            net_income_minor=net_revenue_minor - expense_minor,
+            operating_expense_minor=operating_expense_minor,
+            net_income_minor=gross_profit_minor - operating_expense_minor,
         )
 
     def get_tax_report(self, period_id: str, *, currency: str = "INR") -> TaxReport:

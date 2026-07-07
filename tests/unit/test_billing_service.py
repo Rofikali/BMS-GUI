@@ -40,6 +40,61 @@ class BillingServiceTests(unittest.TestCase):
             self.assertEqual(store.core.verify_file(store.stock_movements), 2)
             self.assertEqual(store.core.verify_file(store.journal_entries), 1)
 
+    def test_create_invoice_posts_weighted_average_cost_of_goods_sold(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store, billing, inventory, accounting = _services(Path(temp_dir))
+            _register_and_stock_item(inventory, quantity=5, unit_cost_minor=30000)
+
+            billing.create_invoice(_invoice("INV-COGS-1", quantity=2, unit_price_minor=50000))
+
+            balances = accounting.get_ledger_balances("FY2026-05")
+            self.assertEqual(balances["5000"].debit_total_minor, 60000)
+            self.assertEqual(balances["5000"].balance_minor, 60000)
+            self.assertEqual(balances["1200"].credit_total_minor, 60000)
+            self.assertEqual(balances["1200"].balance_minor, -60000)
+            self.assertEqual(inventory.get_inventory_value_minor("ITEM-1"), 90000)
+            invoice_lines = store.read_payloads(store.invoice_lines)
+            self.assertEqual(invoice_lines[0]["cogs_unit_cost_minor"], 30000)
+            self.assertEqual(invoice_lines[0]["cogs_minor"], 60000)
+            self.assertEqual(store.core.verify_file(store.journal_lines), 5)
+
+    def test_refund_restock_reverses_original_invoice_cost_of_goods_sold(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            store, billing, inventory, accounting = _services(Path(temp_dir))
+            _register_and_stock_item(inventory, quantity=5, unit_cost_minor=30000)
+            billing.create_invoice(_invoice("INV-COGS-REFUND-1", quantity=2, unit_price_minor=50000))
+
+            refund = billing.create_refund(
+                _refund("REF-COGS-1", original_invoice_id="INV-COGS-REFUND-1", restock=True)
+            )
+
+            balances = accounting.get_ledger_balances("FY2026-05")
+            self.assertEqual(balances["5000"].debit_total_minor, 60000)
+            self.assertEqual(balances["5000"].credit_total_minor, 60000)
+            self.assertEqual(balances["5000"].balance_minor, 0)
+            self.assertEqual(balances["1200"].debit_total_minor, 60000)
+            self.assertEqual(balances["1200"].credit_total_minor, 60000)
+            self.assertEqual(balances["1200"].balance_minor, 0)
+            self.assertEqual(inventory.get_stock_on_hand("ITEM-1"), 5)
+            self.assertEqual(inventory.get_inventory_value_minor("ITEM-1"), 150000)
+            refund_record = store.read_payloads(store.refunds)[0]
+            refund_line = store.read_payloads(store.refund_lines)[0]
+            stock_return = store.read_payloads(store.stock_movements)[-1]
+            refund_journal_lines = [
+                payload
+                for payload in store.read_payloads(store.journal_lines)
+                if payload["journal_id"] == refund.journal_id
+            ]
+            self.assertEqual(refund_record["cogs_restored_minor"], 60000)
+            self.assertEqual(refund_line["cogs_unit_cost_minor"], 30000)
+            self.assertEqual(refund_line["cogs_minor"], 60000)
+            self.assertEqual(stock_return["unit_cost_minor"], 30000)
+            self.assertEqual(stock_return["value_delta_minor"], 60000)
+            self.assertEqual(refund_journal_lines[-2]["account_code"], "1200")
+            self.assertEqual(refund_journal_lines[-2]["debit_minor"], 60000)
+            self.assertEqual(refund_journal_lines[-1]["account_code"], "5000")
+            self.assertEqual(refund_journal_lines[-1]["credit_minor"], 60000)
+
     def test_create_invoice_writes_parent_wal_pending_and_committed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             store, billing, inventory, _accounting = _services(Path(temp_dir))
@@ -218,8 +273,18 @@ class BillingServiceTests(unittest.TestCase):
             self.assertTrue(accounting.get_trial_balance("FY2026-05").is_balanced)
             balances = accounting.get_ledger_balances("FY2026-05")
             self.assertEqual(balances["1000"].balance_minor, 0)
-            self.assertEqual(balances["4000"].balance_minor, 0)
+            self.assertEqual(balances["4000"].credit_total_minor, 100000)
+            self.assertEqual(balances["4000"].balance_minor, 100000)
+            self.assertEqual(balances["4100"].debit_total_minor, 100000)
+            self.assertEqual(balances["4100"].balance_minor, -100000)
             self.assertEqual(balances["2100"].balance_minor, 0)
+            refund_lines = [
+                payload
+                for payload in store.read_payloads(store.journal_lines)
+                if payload["journal_id"] == refund.journal_id
+            ]
+            self.assertEqual(refund_lines[0]["account_code"], "4100")
+            self.assertEqual(refund_lines[0]["debit_minor"], 100000)
             self.assertEqual(store.core.verify_file(store.refunds), 1)
             self.assertEqual(store.core.verify_file(store.refund_lines), 1)
             self.assertEqual(store.core.verify_file(store.stock_movements), 3)
@@ -408,7 +473,7 @@ def _services(root: Path) -> tuple[object, BillingService, InventoryService, Acc
     return store, billing, inventory, accounting
 
 
-def _register_and_stock_item(inventory: InventoryService, *, quantity: int) -> None:
+def _register_and_stock_item(inventory: InventoryService, *, quantity: int, unit_cost_minor: int = 0) -> None:
     inventory.register_item(
         Item("ITEM-1", "SKU-1", "Test Item"),
         actor_id="usr_inventory",
@@ -424,6 +489,7 @@ def _register_and_stock_item(inventory: InventoryService, *, quantity: int) -> N
         reason="opening stock",
         source_document_id="STK-1001",
         correlation_id="corr_stock_in",
+        unit_cost_minor=unit_cost_minor,
     )
 
 

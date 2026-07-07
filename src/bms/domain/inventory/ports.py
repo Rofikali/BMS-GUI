@@ -24,3 +24,9 @@ class InventoryPort(Protocol):
 
     def get_stock_on_hand(self, item_id: str) -> int:
         raise NotImplementedError
+
+    def get_inventory_value_minor(self, item_id: str) -> int:
+        raise NotImplementedError
+
+    def get_weighted_average_unit_cost_minor(self, item_id: str) -> int:
+        raise NotImplementedError

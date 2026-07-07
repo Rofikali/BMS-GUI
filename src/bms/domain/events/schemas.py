@@ -39,6 +39,9 @@ class InventoryStockMovedV1(_BusinessEventSchema):
     movement_type: Literal["stock_in", "stock_out", "adjustment"]
     quantity_delta: int
     quantity_on_hand_after: int
+    unit_cost_minor: int = Field(default=0, ge=0)
+    value_delta_minor: int = 0
+    inventory_value_after_minor: int = 0
     source_document_id: str
 
 
@@ -79,6 +82,7 @@ class BillingRefundCompletedV1(_BusinessEventSchema):
     subtotal_minor: int = Field(ge=0)
     tax_minor: int = Field(ge=0)
     total_minor: int = Field(ge=0)
+    cogs_restored_minor: int = Field(default=0, ge=0)
     line_count: int = Field(ge=1)
 
 

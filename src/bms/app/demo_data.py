@@ -90,9 +90,9 @@ def _register_items(facade: ApplicationCommandFacade) -> None:
 
 
 def _stock_items(facade: ApplicationCommandFacade) -> None:
-    for movement_id, item_id, quantity in (
-        ("MOV-DEMO-RICE-IN", "ITEM-DEMO-RICE", 40),
-        ("MOV-DEMO-OIL-IN", "ITEM-DEMO-OIL", 25),
+    for movement_id, item_id, quantity, unit_cost_minor in (
+        ("MOV-DEMO-RICE-IN", "ITEM-DEMO-RICE", 40, 42000),
+        ("MOV-DEMO-OIL-IN", "ITEM-DEMO-OIL", 25, 12000),
     ):
         facade.commit_stock_movement(
             {
@@ -106,6 +106,7 @@ def _stock_items(facade: ApplicationCommandFacade) -> None:
                 "source_module": "inventory",
                 "source_document_id": "DEMO-STOCK-OPENING",
                 "correlation_id": f"corr_{movement_id}",
+                "unit_cost_minor": unit_cost_minor,
             }
         )
 

@@ -42,6 +42,7 @@ class StockMovementCommandSchema(BaseModel):
     source_module: NonEmptyStr
     source_document_id: NonEmptyStr
     correlation_id: NonEmptyStr
+    unit_cost_minor: StrictInt = Field(default=0, ge=0)
 
     def to_command(self) -> StockMovementCommand:
         return StockMovementCommand(
@@ -55,6 +56,7 @@ class StockMovementCommandSchema(BaseModel):
             source_module=self.source_module,
             source_document_id=self.source_document_id,
             correlation_id=self.correlation_id,
+            unit_cost_minor=self.unit_cost_minor,
         )
 
 

@@ -16,7 +16,7 @@ from bms.domain.billing.schemas import (
     validate_create_invoice_command_payload,
     validate_create_refund_command_payload,
 )
-from bms.domain.billing.service import BillingError, BillingService
+from bms.domain.billing.service import BillingError, BillingService, SalesPostingAccounts
 
 __all__ = [
     "BillingError",
@@ -32,6 +32,7 @@ __all__ = [
     "RefundLineCommand",
     "RefundLineCommandSchema",
     "RefundResult",
+    "SalesPostingAccounts",
     "validate_create_invoice_command_payload",
     "validate_create_refund_command_payload",
 ]
