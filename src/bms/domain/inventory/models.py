@@ -32,6 +32,7 @@ class StockMovementCommand:
     source_document_id: str
     correlation_id: str
     unit_cost_minor: int = 0
+    period_id: str = ""
 
 
 @dataclass(frozen=True)

@@ -452,6 +452,7 @@ def build_main_window_class():
                             "source_document_id": f"OPEN-{item_id}",
                             "correlation_id": f"corr_open_{item_id}",
                             "unit_cost_minor": self.opening_unit_cost_input.value(),
+                            "period_id": self._current_period_id(),
                         }
                     )
                 self.invoice_item_id_input.setText(item_id)

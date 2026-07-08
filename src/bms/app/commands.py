@@ -252,7 +252,7 @@ class ApplicationCommandFacade:
         try:
             self._authorize("inventory.commit_stock_movement", payload)
             command = validate_stock_movement_command_payload(payload)
-            result = self.runtime.inventory.commit_movement(command)
+            result = self.runtime.commit_stock_movement.execute(command)
             return StockMovementOutputSchema.model_validate(result).model_dump(mode="json")
         except Exception as exc:
             raise map_application_error("inventory.commit_stock_movement", exc) from exc

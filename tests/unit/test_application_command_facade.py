@@ -109,6 +109,42 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
             self.assertEqual(sessions["usr_cashier"], ["cashier"])
             self.assertEqual(sessions["usr_accountant"], ["accountant"])
 
+    def test_facade_posts_accounting_for_value_bearing_inventory_adjustments(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            facade = start_command_facade(Path(temp_dir))
+            facade.register_item(_register_item_payload())
+
+            stock_in = facade.commit_stock_movement(
+                {
+                    **_stock_movement_payload("MOV-VALUE-IN", 5, "adjustment"),
+                    "unit_cost_minor": 2000,
+                    "period_id": "FY2026-05",
+                }
+            )
+            stock_out = facade.commit_stock_movement(
+                {
+                    **_stock_movement_payload("MOV-VALUE-OUT", -2, "adjustment"),
+                    "period_id": "FY2026-05",
+                }
+            )
+            ledger = {
+                row["account_code"]: row
+                for row in facade.ledger_report("FY2026-05")["rows"]
+            }
+            stock_report = facade.stock_report()["rows"][0]
+
+            self.assertEqual(stock_in["value_delta_minor"], 10000)
+            self.assertEqual(stock_out["value_delta_minor"], -4000)
+            self.assertEqual(stock_report["quantity_on_hand"], 3)
+            self.assertEqual(stock_report["average_unit_cost_minor"], 2000)
+            self.assertEqual(stock_report["inventory_value_minor"], 6000)
+            self.assertEqual(ledger["1200"]["debit_total_minor"], 10000)
+            self.assertEqual(ledger["1200"]["credit_total_minor"], 4000)
+            self.assertEqual(ledger["1200"]["balance_minor"], 6000)
+            self.assertEqual(ledger["3000"]["credit_total_minor"], 10000)
+            self.assertEqual(ledger["5100"]["debit_total_minor"], 4000)
+            self.assertTrue(facade.trial_balance_report("FY2026-05")["is_balanced"])
+
     def test_facade_lists_and_updates_user_roles_from_admin_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             facade = start_command_facade(Path(temp_dir))

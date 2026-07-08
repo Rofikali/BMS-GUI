@@ -6,7 +6,7 @@ from pathlib import Path
 from bms.app.auth import IdentityService
 from bms.app.bootstrap import initialize_data_root
 from bms.app.startup import StartupHealth, StartupHealthService, StartupState
-from bms.app.use_cases import CreateInvoiceUseCase, CreateRefundUseCase
+from bms.app.use_cases import CommitStockMovementUseCase, CreateInvoiceUseCase, CreateRefundUseCase
 from bms.domain.accounting import AccountingService
 from bms.domain.billing import BillingService
 from bms.domain.inventory import InventoryService
@@ -25,6 +25,7 @@ class ApplicationRuntime:
     startup_health: StartupHealth
     inventory: InventoryService
     accounting: AccountingService
+    commit_stock_movement: CommitStockMovementUseCase
     billing: BillingService
     create_invoice: CreateInvoiceUseCase
     create_refund: CreateRefundUseCase
@@ -49,6 +50,7 @@ def start_application(data_root: Path) -> ApplicationRuntime:
         startup_health=startup_health,
         inventory=inventory,
         accounting=accounting,
+        commit_stock_movement=CommitStockMovementUseCase(inventory, accounting),
         billing=billing,
         create_invoice=CreateInvoiceUseCase(billing),
         create_refund=CreateRefundUseCase(billing),
