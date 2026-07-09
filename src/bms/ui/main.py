@@ -275,6 +275,7 @@ def build_main_window_class():
             self.report_refund_total_label = qt.QLabel("0")
             self.report_refundable_remaining_label = qt.QLabel("0")
             self.report_tax_payable_label = qt.QLabel("0")
+            self.report_reconciliation_label = qt.QLabel("Unknown")
             self.report_trial_balance_label = qt.QLabel("Unknown")
             self.report_net_revenue_label = qt.QLabel("0")
             self.report_cogs_label = qt.QLabel("0")
@@ -287,6 +288,7 @@ def build_main_window_class():
                 "Refundable remaining", self.report_refundable_remaining_label
             )
             summary.addRow("Tax payable", self.report_tax_payable_label)
+            summary.addRow("Reconciliation", self.report_reconciliation_label)
             summary.addRow("Trial balance", self.report_trial_balance_label)
             summary.addRow("Net revenue", self.report_net_revenue_label)
             summary.addRow("COGS", self.report_cogs_label)
@@ -771,6 +773,7 @@ def build_main_window_class():
                 currency=currency,
             )
             tax_report = self.facade.tax_report(period_id, currency=currency)
+            reconciliation = self.facade.reconciliation_report(period_id)
             trial_balance = self.facade.trial_balance_report(period_id)
 
             invoice_total = sum(
@@ -787,6 +790,9 @@ def build_main_window_class():
             self.report_refundable_remaining_label.setText(str(refundable_remaining))
             self.report_tax_payable_label.setText(
                 str(tax_report["tax_payable_balance_minor"])
+            )
+            self.report_reconciliation_label.setText(
+                "Passed" if reconciliation["passed"] else "Failed"
             )
             self.report_trial_balance_label.setText(
                 "Balanced" if trial_balance["is_balanced"] else "Unbalanced"

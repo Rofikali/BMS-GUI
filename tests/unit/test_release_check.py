@@ -22,7 +22,9 @@ class ReleaseCheckTests(unittest.TestCase):
             self.assertEqual(result.tax_payable_minor, 9000)
             self.assertEqual(result.business_unit_net_revenue_minor, 50000)
             self.assertTrue(result.trial_balance_balanced)
+            self.assertTrue(result.reconciliation_passed)
             self.assertTrue(result.restored_trial_balance_balanced)
+            self.assertTrue(result.restored_reconciliation_passed)
 
     def test_release_check_refuses_non_empty_roots(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

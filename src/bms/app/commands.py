@@ -270,7 +270,7 @@ class ApplicationCommandFacade:
         try:
             self._authorize("accounting.close_period", payload)
             request = ClosePeriodCommandPayloadSchema.model_validate(payload)
-            self.runtime.accounting.close_period(
+            self.runtime.close_period.execute(
                 request.period_id,
                 actor_id=request.actor_id,
                 closed_at=request.closed_at,
@@ -373,6 +373,12 @@ class ApplicationCommandFacade:
             return self.runtime.reporting.export_trial_balance_report(period_id)
         except Exception as exc:
             raise map_application_error("reporting.trial_balance_report", exc) from exc
+
+    def reconciliation_report(self, period_id: str) -> dict[str, Any]:
+        try:
+            return self.runtime.reconciliation.export_reconciliation_report(period_id)
+        except Exception as exc:
+            raise map_application_error("reconciliation.report", exc) from exc
 
     def create_backup(self, payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
         try:

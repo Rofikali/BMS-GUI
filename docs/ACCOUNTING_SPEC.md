@@ -161,6 +161,7 @@ Closed periods:
 - allow reversal entries only in an open period
 - preserve reports as originally produced
 - require admin/accountant approval to reopen
+- require reconciliation checks to pass before close
 
 ---
 
@@ -172,3 +173,5 @@ MVP reconciliation targets:
 - stock quantity vs inventory ledger
 - tax payable report vs tax ledger
 - receivables list vs AR control account
+- sales/refunds reports vs revenue and contra-revenue ledgers
+- invoice/refund COGS records vs cost of goods sold ledger

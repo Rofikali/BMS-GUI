@@ -133,6 +133,7 @@ class InventoryService:
                 "movement_id": command.movement_id,
                 "item_id": command.item_id,
                 "quantity_delta": command.quantity_delta,
+                "period_id": _movement_period_id(command),
                 "unit_cost_minor": unit_cost_minor,
                 "value_delta_minor": value_delta_minor,
                 "source_document_id": command.source_document_id,
@@ -150,6 +151,7 @@ class InventoryService:
                 "movement_type": command.movement_type.value,
                 "quantity_delta": command.quantity_delta,
                 "quantity_on_hand_after": next_quantity,
+                "period_id": _movement_period_id(command),
                 "unit_cost_minor": unit_cost_minor,
                 "value_delta_minor": value_delta_minor,
                 "inventory_value_after_minor": inventory_value_after_minor,
@@ -175,6 +177,7 @@ class InventoryService:
                 "movement_type": command.movement_type.value,
                 "quantity_delta": command.quantity_delta,
                 "quantity_on_hand_after": next_quantity,
+                "period_id": _movement_period_id(command),
                 "unit_cost_minor": unit_cost_minor,
                 "value_delta_minor": value_delta_minor,
                 "inventory_value_after_minor": inventory_value_after_minor,
@@ -193,6 +196,7 @@ class InventoryService:
                 "movement_type": command.movement_type.value,
                 "quantity_delta": command.quantity_delta,
                 "quantity_on_hand_after": next_quantity,
+                "period_id": _movement_period_id(command),
                 "unit_cost_minor": unit_cost_minor,
                 "value_delta_minor": value_delta_minor,
                 "inventory_value_after_minor": inventory_value_after_minor,
@@ -271,6 +275,19 @@ class InventoryService:
                 value_minor += _int_payload(payload, "value_delta_minor")
         return value_minor
 
+    def get_total_inventory_value_minor(self) -> int:
+        value_minor = 0
+        for payload in self.store.read_payloads(self.store.stock_movements):
+            value_minor += _int_payload(payload, "value_delta_minor")
+        return value_minor
+
+    def get_inventory_value_delta_minor(self, period_id: str) -> int:
+        value_minor = 0
+        for payload in self.store.read_payloads(self.store.stock_movements):
+            if _stock_movement_period_id(payload) == period_id:
+                value_minor += _int_payload(payload, "value_delta_minor")
+        return value_minor
+
     def get_weighted_average_unit_cost_minor(self, item_id: str) -> int:
         quantity = self.get_stock_on_hand(item_id)
         if quantity <= 0:
@@ -345,3 +362,21 @@ def _int_payload(payload: dict[str, object], key: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise InventoryError(f"stored payload field {key} is not an integer")
     return value
+
+
+def _movement_period_id(command: StockMovementCommand) -> str:
+    return command.period_id or _period_id_from_timestamp(command.timestamp)
+
+
+def _stock_movement_period_id(payload: dict[str, object]) -> str:
+    value = payload.get("period_id")
+    if isinstance(value, str) and value:
+        return value
+    timestamp = payload.get("timestamp")
+    if not isinstance(timestamp, str) or len(timestamp) < 7:
+        raise InventoryError("stored stock movement period cannot be derived")
+    return _period_id_from_timestamp(timestamp)
+
+
+def _period_id_from_timestamp(timestamp: str) -> str:
+    return f"FY{timestamp[:7]}"

@@ -19,9 +19,11 @@ Register item
 -> Validate stock
 -> Calculate tax
 -> Post journal
+-> Reconcile subledgers to ledger balances
 -> Persist durable records
 -> Write audit and business events
 -> Rebuild reports after restart
+-> Pass reconciliation checks
 -> Close accounting period
 -> Block closed-period invoice and journal mutations
 -> Create backup
@@ -55,7 +57,7 @@ The verification gate includes the product-level MVP acceptance smoke. It can al
 uv run bms-release-check
 ```
 
-This command creates a clean temporary data root, runs the release lifecycle from section 1, validates the expected business totals, closes the period, verifies backup/restore, and exits non-zero on mismatch.
+This command creates a clean temporary data root, runs the release lifecycle from section 1, validates the expected business totals and reconciliation checks, closes the period, verifies backup/restore, and exits non-zero on mismatch.
 
 A skipped UI test is acceptable only when the local host cannot load native Qt libraries. CI should install the Qt/GL system packages required for the PySide6 smoke test.
 
@@ -77,11 +79,13 @@ A release candidate is blocked if any of these fail:
 - stock can go negative when the policy disables it
 - duplicate invoice, journal, movement, or idempotency keys double-apply effects
 - closed periods accept financial mutations
+- periods close while reconciliation checks are failing
 - append-only record checksum verification fails
 - WAL startup inspection misses pending or corrupt state
 - protected-mode storage allows normal app startup
 - backup restore does not reproduce report totals and stock state
 - restored record counts differ from the backup manifest
+- reconciliation checks between inventory, tax, sales, refund, COGS subledgers, and ledger balances fail
 - UI/facade workflows bypass command validation or domain services
 
 ---
@@ -96,6 +100,7 @@ A release candidate is blocked if any of these fail:
 | Billing | invoice and refund create stock movement where applicable, journal, audit, event, and durable records |
 | Events | known business events validate against schemas before persistence |
 | Reporting | invoice, refund, refund availability, stock, ledger, tax, trial balance, and P&L reports rebuild from records |
+| Reconciliation | inventory value, tax, sales revenue, sales returns, and COGS reconcile to ledger balances |
 | Backup | backup manifest validates, restore validates, restored reports match source |
 | Runtime | startup health blocks recovery-required and protected storage, including partial refund side effects |
 | Facade | raw payloads validate through app command boundary before service calls and role permissions are enforced |
@@ -117,7 +122,7 @@ Then complete this workflow:
 Inventory tab: register item with opening stock
 Billing tab: create invoice for that item
 Billing tab: create a partial refund for that invoice
-Reports tab: confirm invoice total, refund total, still-refundable quantity, stock on hand, tax payable, and balanced trial balance
+Reports tab: confirm invoice total, refund total, still-refundable quantity, stock on hand, tax payable, reconciliation passed, and balanced trial balance
 Reports tab: close the accounting period
 Billing tab: confirm a new invoice for that closed period is blocked
 Backup tab: create backup
@@ -133,6 +138,7 @@ Expected visible results after the invoice and one-unit refund:
 | Refundable remaining | `50000` |
 | Stock on hand | `4` |
 | Tax payable | `9000` |
+| Reconciliation | `Passed` |
 | Trial balance | `Balanced` |
 | Closed-period invoice attempt | blocked with a closed-period error |
 

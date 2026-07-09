@@ -63,6 +63,7 @@ class UiMainTests(unittest.TestCase):
             self.assertEqual(window.report_refund_total_label.text(), "59000")
             self.assertEqual(window.report_refundable_remaining_label.text(), "50000")
             self.assertEqual(window.report_tax_payable_label.text(), "9000")
+            self.assertEqual(window.report_reconciliation_label.text(), "Passed")
             self.assertEqual(window.report_net_revenue_label.text(), "50000")
             self.assertEqual(window.report_cogs_label.text(), "30000")
             self.assertEqual(window.report_gross_profit_label.text(), "20000")
@@ -455,6 +456,9 @@ class _CapturingFacade:
     def tax_report(self, period_id, *, currency: str = "INR"):
         self.tax_report_calls.append((period_id, currency))
         return {"tax_payable_balance_minor": 0}
+
+    def reconciliation_report(self, period_id):
+        return {"passed": True, "checks": []}
 
     def trial_balance_report(self, period_id):
         return {"is_balanced": True}

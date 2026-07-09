@@ -23,7 +23,9 @@ class ReleaseCheckResult:
     tax_payable_minor: int
     business_unit_net_revenue_minor: int
     trial_balance_balanced: bool
+    reconciliation_passed: bool
     restored_trial_balance_balanced: bool
+    restored_reconciliation_passed: bool
 
 
 def run_release_check(data_root: Path, restore_root: Path) -> ReleaseCheckResult:
@@ -43,6 +45,7 @@ def run_release_check(data_root: Path, restore_root: Path) -> ReleaseCheckResult
     tax_report = facade.tax_report("FY2026-05")
     business_unit_revenue = facade.business_unit_revenue_report("FY2026-05")
     trial_balance = facade.trial_balance_report("FY2026-05")
+    reconciliation = facade.reconciliation_report("FY2026-05")
 
     facade.close_period(_close_period_payload())
     _assert_closed_period_blocks_invoice(facade)
@@ -60,6 +63,7 @@ def run_release_check(data_root: Path, restore_root: Path) -> ReleaseCheckResult
 
     restored = start_command_facade(restore_root)
     restored_trial_balance = restored.trial_balance_report("FY2026-05")
+    restored_reconciliation = restored.reconciliation_report("FY2026-05")
 
     invoice_total = _first_total(invoice_report)
     refund_total = _first_total(refund_report)
@@ -77,8 +81,12 @@ def run_release_check(data_root: Path, restore_root: Path) -> ReleaseCheckResult
     _assert_equal(business_unit_net_revenue, 50000, "business unit net revenue")
     if not trial_balance["is_balanced"]:
         raise ReleaseCheckError("trial balance is not balanced")
+    if not reconciliation["passed"]:
+        raise ReleaseCheckError("reconciliation report did not pass")
     if not restored_trial_balance["is_balanced"]:
         raise ReleaseCheckError("restored trial balance is not balanced")
+    if not restored_reconciliation["passed"]:
+        raise ReleaseCheckError("restored reconciliation report did not pass")
 
     return ReleaseCheckResult(
         data_root=data_root,
@@ -90,7 +98,9 @@ def run_release_check(data_root: Path, restore_root: Path) -> ReleaseCheckResult
         tax_payable_minor=int(tax_report["tax_payable_balance_minor"]),
         business_unit_net_revenue_minor=business_unit_net_revenue,
         trial_balance_balanced=bool(trial_balance["is_balanced"]),
+        reconciliation_passed=bool(reconciliation["passed"]),
         restored_trial_balance_balanced=bool(restored_trial_balance["is_balanced"]),
+        restored_reconciliation_passed=bool(restored_reconciliation["passed"]),
     )
 
 
@@ -123,7 +133,9 @@ def _print_result(result: ReleaseCheckResult) -> None:
         f"tax_payable_minor={result.tax_payable_minor} "
         f"business_unit_net_revenue_minor={result.business_unit_net_revenue_minor} "
         f"trial_balance_balanced={result.trial_balance_balanced} "
-        f"restored_trial_balance_balanced={result.restored_trial_balance_balanced}"
+        f"reconciliation_passed={result.reconciliation_passed} "
+        f"restored_trial_balance_balanced={result.restored_trial_balance_balanced} "
+        f"restored_reconciliation_passed={result.restored_reconciliation_passed}"
     )
 
 

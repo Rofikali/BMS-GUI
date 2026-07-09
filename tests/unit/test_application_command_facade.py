@@ -360,6 +360,33 @@ class ApplicationCommandFacadeTests(unittest.TestCase):
             self.assertEqual(context.exception.operation, "billing.create_invoice")
             self.assertIsInstance(context.exception.__cause__, BillingError)
 
+    def test_facade_blocks_period_close_when_reconciliation_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            facade = start_command_facade(Path(temp_dir))
+            facade.post_journal(
+                {
+                    "journal_id": "JRN-UNRECONCILED-INVENTORY",
+                    "period_id": "FY2026-05",
+                    "timestamp": "2026-05-14T02:00:00Z",
+                    "actor_id": "usr_accountant",
+                    "source_module": "manual",
+                    "source_document_id": "ADJ-UNRECONCILED",
+                    "correlation_id": "corr_JRN_UNRECONCILED",
+                    "description": "Manual inventory journal without subledger",
+                    "lines": [
+                        {"account_code": "1200", "debit_minor": 1000, "currency": "INR"},
+                        {"account_code": "3000", "credit_minor": 1000, "currency": "INR"},
+                    ],
+                }
+            )
+
+            with self.assertRaises(ApplicationCommandError) as context:
+                facade.close_period(_close_period_payload())
+
+            self.assertEqual(context.exception.code, ApplicationErrorCode.BUSINESS_RULE)
+            self.assertEqual(context.exception.operation, "accounting.close_period")
+            self.assertIn("reconciliation failed", str(context.exception.__cause__))
+
     def test_facade_rejects_unauthorized_period_close_before_service_call(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             facade = start_command_facade(Path(temp_dir))

@@ -8,6 +8,11 @@ from bms.domain.billing.models import CreateInvoiceCommand, CreateRefundCommand,
 from bms.domain.billing.ports import BillingPort
 from bms.domain.inventory.models import StockMovementCommand, StockMovementResult
 from bms.domain.inventory.ports import InventoryPort
+from bms.domain.reconciliation import ReconciliationService
+
+
+class PeriodCloseError(ValueError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -56,6 +61,31 @@ class CommitStockMovementUseCase:
         return (
             JournalLine(accounts.inventory_adjustment_expense, debit_minor=value_minor),
             JournalLine(accounts.inventory, credit_minor=value_minor),
+        )
+
+
+@dataclass(frozen=True)
+class ClosePeriodUseCase:
+    accounting: AccountingPort
+    reconciliation: ReconciliationService
+
+    def execute(
+        self,
+        period_id: str,
+        *,
+        actor_id: str,
+        closed_at: str | None = None,
+        correlation_id: str | None = None,
+    ) -> None:
+        report = self.reconciliation.get_reconciliation_report(period_id)
+        if not report.passed:
+            failed = ", ".join(check.name for check in report.checks if not check.passed)
+            raise PeriodCloseError(f"period {period_id} cannot close; reconciliation failed: {failed}")
+        self.accounting.close_period(
+            period_id,
+            actor_id=actor_id,
+            closed_at=closed_at,
+            correlation_id=correlation_id,
         )
 
 
